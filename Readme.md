@@ -33,7 +33,12 @@ packages/ (optional for local path dev)
   company/billing
   company/hr
   company/cms
+examples/
+  acme-blog
+  acme-analytics
 ```
+
+> Explore the reference modules under [`examples/`](examples/) and the accompanying integration guide in [`docs/using-examples.md`](docs/using-examples.md) for a hands-on walkthrough of how the orchestrator boots real features inside a host Laravel application.
 
 **Orchestrator responsibilities**
 1. **Discovery**: Find modules via Composer metadata (preferred) and/or `module.json`.
