@@ -10,7 +10,8 @@
   ],
   "type": "library",
   "require": {
-    "php": ">=8.2"
+    "php": ">=8.2",
+    "glugox/module": "^1.0"
   },
   "require-dev": {
     "driftingly/rector-laravel": "^2.0.7",
@@ -62,6 +63,15 @@
       "php-http/discovery": true
     }
   },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "../module",
+      "options": {
+        "symlink": true
+      }
+    }
+  ],
   "minimum-stability": "dev",
   "prefer-stable": true,
   "scripts": {
