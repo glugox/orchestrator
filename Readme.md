@@ -1,129 +1,157 @@
 # ![logo.svg](https://raw.githubusercontent.com/glugox/cloud/main/public/logo.svg) Orchestrator
 
+## Overview
 
-## Introduction
+`glugox/orchestrator` is the **runtime module manager** for Laravel applications that embrace the Glugox modular ecosystem. The
+package discovers available modules, registers them with the framework, and gives developers tooling to enable, disable, and
+monitor every module that powers their application.
 
-The `glugox/orchestrator` package is the **runtime manager** for modules in a Laravel application. It discovers, loads, enables, disables, and manages modules that are built on top of `glugox/module`. It ensures that the application remains modular, scalable, and easy to maintain.
-
-This package provides the orchestration layer that ties modules together into a unified Laravel application.
-
----
-
-## Key Concepts
-
-### 1. Module Discovery
-
-* Orchestrator scans for modules via:
-
-    * `composer.json` metadata
-    * `modules/` directory
-    * Manifest files (`manifest.json`)
-* Discovered modules are registered into the Laravel application lifecycle.
-
-### 2. Module Lifecycle
-
-* Modules can be:
-
-    * **Enabled** → Service provider is registered, routes, migrations, and assets loaded.
-    * **Disabled** → Skipped during boot.
-    * **Removed** → Deleted/uninstalled from app.
-
-### 3. Integration with `glugox/module`
-
-* Relies on contracts like `ModuleContract`, `HasRoutes`, `HasMigrations`, etc.
-* Uses `ModuleManifest` to extract module metadata.
-* Loads `ModuleServiceProvider` into Laravel.
-
-### 4. Developer Tools
-
-* Artisan commands for managing modules.
-* APIs to interact with orchestrator programmatically.
+Where [`glugox/module`](https://github.com/glugox/module) defines the contracts a module must fulfil and
+[`glugox/module-generator`](https://github.com/glugox/module-generator) scaffolds new modules, orchestrator is the piece that
+connects everything at runtime inside the main Laravel app.
 
 ---
 
-## Package Features
-
-* **Module Management Commands**:
-
-    * `php artisan orchestrator:modules:list` → lists all modules with status.
-    * `php artisan orchestrator:modules:enable {id}` → enables a module.
-    * `php artisan orchestrator:modules:disable {id}` → disables a module.
-    * `php artisan orchestrator:modules:reload` → rescans and reloads all modules.
-
-* **Configurable Module Paths** → supports custom module directories.
-
-* **Dependency Management** → ensures that dependent modules are enabled first.
-
-* **Version Awareness** → can detect and report mismatches between module versions.
-
----
-
-## Package Structure
+## Architecture at a Glance
 
 ```
-glugox/orchestrator/
-├── src/
-│   ├── Commands/
-│   │   ├── ListModulesCommand.php
-│   │   ├── EnableModuleCommand.php
-│   │   ├── DisableModuleCommand.php
-│   │   └── ReloadModulesCommand.php
-│   ├── Services/
-│   │   ├── ModuleManager.php
-│   │   └── ModuleRegistry.php
-│   ├── Support/
-│   │   ├── ModuleDiscovery.php
-│   │   └── OrchestratorConfig.php
-│   └── OrchestratorServiceProvider.php
-└── composer.json
+┌────────────────────┐         ┌────────────────────┐         ┌────────────────────┐
+│  Main Laravel App  │────┬──▶ │  glugox/orchestr. │ ───────▶ │    Module Runtime  │
+└────────────────────┘    │    └────────────────────┘         │ (Routes, Migrations│
+                          │                                    │  Providers, etc.)  │
+                          │    ┌────────────────────┐         └────────────────────┘
+                          └──▶ │  glugox/module     │ ◀────┐
+                               └────────────────────┘      │
+                                                            │
+                               ┌────────────────────┐      │
+                               │ glugox/module-gen. │ ─────┘
+                               └────────────────────┘
 ```
+
+* **Main Laravel App** – hosts the modules and exposes the artisan commands and APIs to administrators.
+* **glugox/orchestrator** – discovers, validates, enables, disables, and boots modules.
+* **glugox/module** – provides the base `ModuleContract`, lifecycle hooks, and helper traits that orchestrator consumes.
+* **glugox/module-generator** – produces modules that follow the conventions required by both orchestrator and
+  `glugox/module`.
 
 ---
 
-## Example Workflow
-
-1. Install `glugox/orchestrator` in a Laravel app:
+## Installation
 
 ```bash
 composer require glugox/orchestrator
 ```
 
-2. Run module discovery:
+Laravel auto-discovers the service provider. If you want explicit control, register it in `config/app.php`:
+
+```php
+'providers' => [
+    // ...
+    Glugox\Orchestrator\OrchestratorServiceProvider::class,
+],
+```
+
+Publish the configuration file to customise module directories and discovery options:
 
 ```bash
-php artisan orchestrator:modules:list
+php artisan vendor:publish --provider="Glugox\Orchestrator\OrchestratorServiceProvider"
 ```
-
-Output:
-
-```
-ID                Name      Version   Status
-company/billing   Billing   1.0.0     Enabled
-company/crm       CRM       1.0.0     Disabled
-```
-
-3. Enable a module:
-
-```bash
-php artisan orchestrator:modules:enable company/crm
-```
-
-4. Orchestrator automatically:
-
-    * Loads `CRMModule` class (extending `Module` from `glugox/module`).
-    * Registers its service provider.
-    * Loads routes, migrations, and assets if provided.
 
 ---
 
-## Example API Usage
+## Configuration
+
+The published `config/orchestrator.php` file controls how modules are located and managed.
+
+Key settings include:
+
+* **`paths.modules`** – directories that should be scanned for modules (defaults to `base_path('modules')`).
+* **`manifest`** – file name that stores cached discovery information.
+* **`autoload`** – toggles whether discovered modules should be automatically registered at boot.
+
+Configuration values are consumed by `Support\OrchestratorConfig`, keeping discovery behaviour consistent across commands
+and runtime services.
+
+---
+
+## Module Lifecycle
+
+1. **Discovery** – `Support\ModuleDiscovery` scans configured directories and composer metadata for modules. Manifest files
+   speed up repeat scans.
+2. **Registration** – Discovered modules are registered with the Laravel container via `OrchestratorServiceProvider`.
+3. **Boot** – When a module is enabled, orchestrator resolves its `ModuleServiceProvider` (defined by `glugox/module`) and
+   loads routes, migrations, translations, and assets.
+4. **Management** – The lifecycle can be controlled via artisan commands or the `Services\ModuleManager` API.
+
+Modules generated by `glugox/module-generator` already implement the contracts from `glugox/module`, so they are immediately
+compatible with orchestrator.
+
+---
+
+## Command Reference
+
+* `php artisan orchestrator:modules:list` – show every discovered module with its current status.
+* `php artisan orchestrator:modules:enable {module}` – enable a module and boot its service provider.
+* `php artisan orchestrator:modules:disable {module}` – disable a module while keeping it installed.
+* `php artisan orchestrator:modules:reload` – flush the manifest cache and rediscover modules.
+
+Commands delegate to `Services\ModuleManager` and `Services\ModuleRegistry`, which encapsulate runtime state and
+synchronisation logic.
+
+---
+
+## Using Orchestrator in Your Application
+
+### Bootstrapping Modules During Application Start
+
+The service provider hooks into Laravel's boot sequence. When the application starts, orchestrator:
+
+1. Reads the manifest to determine available modules.
+2. Resolves each module's metadata via `ModuleRegistry`.
+3. For enabled modules, registers the corresponding `ModuleServiceProvider` from the module package.
+4. Invokes lifecycle hooks such as `bootRoutes`, `bootMigrations`, and `bootAssets` that are declared by the module through
+   the interfaces in `glugox/module`.
+
+Because the work is performed in a service provider, modules participate in the Laravel pipeline like any other package,
+benefiting from deferred service loading, configuration merging, and event listeners.
+
+### Coordinating with glugox/module
+
+`glugox/module` supplies the contracts and base implementations that orchestrator relies on. When a module implements the
+`ModuleContract`, orchestrator can:
+
+* Inspect the module identifier, version, and dependencies.
+* Resolve the module's custom service provider class.
+* Invoke optional capabilities such as route, migration, or asset loading.
+
+If a module declares dependencies, orchestrator ensures they are enabled first, preventing runtime mismatches.
+
+### Integrating Modules Generated by glugox/module-generator
+
+`glugox/module-generator` scaffolds modules that already follow the directory structure and class naming conventions
+required by orchestrator. Typical workflow:
+
+1. Generate a module:
+
+   ```bash
+   php artisan module:make Inventory
+   ```
+
+2. The generator creates the module skeleton, including the service provider and manifest expected by orchestrator.
+3. Run `php artisan orchestrator:modules:reload` to discover the new module.
+4. Enable it with `php artisan orchestrator:modules:enable company/inventory` and the module becomes part of the application
+   immediately.
+
+---
+
+## Programmatic Usage
 
 ```php
 use Glugox\Orchestrator\Services\ModuleManager;
 
 $manager = app(ModuleManager::class);
 
-// List all modules
+// Retrieve all modules
 $modules = $manager->all();
 
 // Enable a module
@@ -133,205 +161,34 @@ $manager->enable('company/billing');
 $manager->disable('company/crm');
 ```
 
----
-
-## How It Fits in the Ecosystem
-
-* **`glugox/module`** provides the contracts and abstractions orchestrator enforces.
-* **`glugox/module-generator`** produces modules that orchestrator can discover and manage.
-* **Main Laravel App** → orchestrator integrates modules seamlessly into the app lifecycle.
+`ModuleManager` talks to `ModuleRegistry` to keep module status in sync with the manifest file, and raises domain-specific
+exceptions if modules cannot be located or have unmet dependencies.
 
 ---
 
-## Benefits
-
-* **Centralized Management** → All modules are controlled via a single tool.
-* **Scalability** → Large Laravel apps remain organized with plug-and-play modules.
-* **Flexibility** → Supports both local modules (`/modules`) and composer-installed ones.
-* **Control** → Modules can be enabled/disabled without code changes.
-
----
-
-## Next Steps
-
-* Add GUI/Dashboard integration for module management.
-* Implement dependency resolution between modules.
-* Add support for remote module registries.
-* Provide hooks for module lifecycle events (before enable, after disable, etc.).
-
-
----
-## How it works in the greater ecosystem
-# ![logo.svg](https://raw.githubusercontent.com/glugox/cloud/main/public/logo.svg) Cloud
-
-
-Build and deploy modular Laravel applications with ease.
-
-### Glugox Modular Ecosystem
-
-## Introduction
-
-The Glugox Modular Ecosystem enables building **large, modular Laravel applications** with minimal code in the main Laravel folder structure. It is composed of three tightly integrated packages:
-
-* **[`glugox/module`](https://github.com/glugox/module)** → defines contracts, abstractions, and base classes for modules.
-* **[`glugox/module-generator`](https://github.com/glugox/module-generator)** → scaffolds modules from JSON/YAML specifications.
-* **[`glugox/orchestrator`](https://github.com/glugox/orchestrator)** → manages modules (discovery, enable/disable, lifecycle) inside a Laravel application.
-
-This ecosystem allows developers to focus on high-level specifications while the tooling handles scaffolding and orchestration.
-
----
-
-## Packages Overview
-
-### 1. glugox/module (Foundation)
-
-* Defines contracts (`ModuleContract`, `HasRoutes`, `HasMigrations`, etc.).
-* Provides the `Module` base class.
-* Implements `ModuleManifest` for module metadata.
-* Ensures all modules are consistent and self-describing.
-
-### 2. glugox/module-generator (Factory)
-
-* Reads module specs (`/specs/*.json` or `.yaml`).
-* Generates fully structured modules under `/modules/{Vendor}/{Name}`.
-* Produces backend (models, migrations, routes) and frontend (Vue/Inertia) scaffolding.
-* Ensures compliance with `glugox/module` contracts.
-
-### 3. glugox/orchestrator (Conductor)
-
-* Discovers installed modules.
-* Loads their manifests and registers service providers.
-* Provides artisan commands to enable, disable, and list modules.
-* Controls module lifecycle at runtime.
-
----
-
-## Example Workflow
-
-1. **Define a Spec**
-
-```json
-{
-  "schemaVersion": "1.0.0",
-  "module": {
-    "id": "company/billing",
-    "name": "Billing",
-    "namespace": "Company\\Billing",
-    "description": "Invoices and payments",
-    "capabilities": ["http:web", "http:api"]
-  },
-  "models": [
-    {
-      "name": "Invoice",
-      "fields": [
-        { "name": "number", "type": "string" },
-        { "name": "amount", "type": "decimal" },
-        { "name": "status", "type": "enum:pending,paid,cancelled" }
-      ]
-    }
-  ]
-}
-```
-
-2. **Generate Module**
-
-```bash
-php artisan module:generate billing
-```
-
-3. **List Modules**
-
-```bash
-php artisan orchestrator:modules:list
-```
-
-4. **Enable Module**
-
-```bash
-php artisan orchestrator:modules:enable company/billing
-```
-
-5. **Run Application**
-
-* Orchestrator loads the Billing module.
-* Service provider, migrations, routes, and assets are available.
-
----
-
-## Directory Layout
+## Project Structure
 
 ```
-myapp/
-├── specs/
-│   ├── billing.json
-│   └── crm.json
-├── modules/
-│   ├── Company/
-│   │   └── Billing/
-│   └── Company/
-│       └── Crm/
-├── vendor/
-│   ├── glugox/module
-│   ├── glugox/module-generator
-│   └── glugox/orchestrator
-└── composer.json
+src/
+├── Commands/
+│   ├── DisableModuleCommand.php
+│   ├── EnableModuleCommand.php
+│   ├── ListModulesCommand.php
+│   └── ReloadModulesCommand.php
+├── Services/
+│   ├── ModuleManager.php
+│   └── ModuleRegistry.php
+├── Support/
+│   ├── ModuleDiscovery.php
+│   └── OrchestratorConfig.php
+└── OrchestratorServiceProvider.php
 ```
 
 ---
 
-## Responsibilities
+## Roadmap Ideas
 
-### For Module Developers
-
-* Extend `Module` class from `glugox/module`.
-* Provide routes, migrations, and service provider.
-* Follow manifest structure.
-
-### For Generator Developers
-
-* Maintain parsers and templates.
-* Ensure generator output strictly follows `glugox/module`.
-* Extend with frontend and testing scaffolds.
-
-### For Orchestrator Developers
-
-* Maintain discovery and lifecycle logic.
-* Implement artisan commands.
-* Ensure safe integration into Laravel boot cycle.
-
-### For Main App Developers
-
-* Write specs in `/specs`.
-* Generate modules with `module-generator`.
-* Use `orchestrator` commands to enable/disable modules.
-* Keep the main app minimal.
-
----
-
-## Benefits
-
-* **Separation of Concerns** → contracts, generation, and orchestration are independent.
-* **Consistency** → all modules follow the same structure.
-* **Scalability** → supports very large Laravel applications.
-* **Developer Velocity** → new features added rapidly via specs.
-
----
-
-## Next Steps
-
-* Provide demo app (`glugox/app-demo`).
-* Add CI/CD pipelines for regeneration and tests.
-* Extend generator for advanced cases (multi-tenancy, permissions).
-* Build admin dashboard for visual module management.
-
----
-
-## Summary
-
-The Glugox ecosystem standardizes how modules are **defined**, **generated**, and **managed** in Laravel:
-
-* `glugox/module`: the **foundation**.
-* `glugox/module-generator`: the **factory**.
-* `glugox/orchestrator`: the **conductor**.
-
-Together, they enable highly modular, reusable, and maintainable Laravel applications.
+* Optional dashboard UI for module management.
+* Declarative dependency resolution between modules.
+* Remote module registries with signed manifests.
+* Lifecycle hooks for pre/post enable and disable events.

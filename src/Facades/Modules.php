@@ -17,8 +17,10 @@ use Illuminate\Support\Facades\Facade;
  * @method static void install(string $id)
  * @method static void uninstall(string $id, bool $dropData = false)
  * @method static array discover(bool $writeManifest = true)
+ * @method static array reload(bool $writeManifest = true)
  * @method static void cache()
  * @method static void clearCache()
+ * @method static void registerEnabledModules(?\Illuminate\Contracts\Foundation\Application $application = null)
  * @see \Glugox\Orchestrator\ModuleManager
  */
 class Modules extends Facade

@@ -2,61 +2,67 @@
 
 namespace Glugox\Orchestrator;
 
+use Glugox\Orchestrator\Services\ModuleRegistry;
+use Glugox\Orchestrator\Support\ModuleDiscovery;
+use Glugox\Orchestrator\Support\OrchestratorConfig;
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
-use InvalidArgumentException;
-use RuntimeException;
 
 class ModuleManager
 {
-    /**
-     * @var array<string, ModuleDescriptor>
-     */
-    protected array $modules = [];
+    protected ModuleRegistry $registry;
+
+    protected OrchestratorConfig $config;
+
+    protected ?Application $application;
 
     /**
-     * @var array<string, mixed>
+     * @var array<string, bool>
      */
-    protected array $config;
-
-    protected string $basePath;
-
-    protected ModuleManifest $manifest;
-
-    protected string $installedPath;
+    protected array $registeredProviders = [];
 
     /**
      * @param  array<string, mixed>|null  $config
      */
-    public function __construct(?array $config = null)
+    public function __construct(?array $config = null, ?ModuleRegistry $registry = null, ?Application $application = null)
     {
-        $this->config = $config ?? config('orchestrator', []);
-        $this->basePath = $this->resolveBasePath($this->config['base_path'] ?? null);
-        $manifestPath = $this->absolutePath($this->config['manifest_path'] ?? 'bootstrap/cache/modules.php');
-        $this->manifest = new ModuleManifest($manifestPath);
-        $this->installedPath = $this->absolutePath($this->config['installed_path'] ?? 'vendor/composer/installed.json');
+        if ($registry) {
+            $this->registry = $registry;
+            $this->config = $registry->config();
+        } else {
+            $resolved = is_array($config) ? $config : (config('orchestrator') ?? []);
+            if (! is_array($resolved)) {
+                $resolved = [];
+            }
 
-        $this->modules = $this->loadCachedModules();
-
-        if ($this->modules === []) {
-            $this->discover();
+            $this->config = new OrchestratorConfig($resolved);
+            $manifest = new ModuleManifest($this->config->manifestPath());
+            $discovery = new ModuleDiscovery($this->config);
+            $this->registry = new ModuleRegistry($this->config, $discovery, $manifest);
         }
+
+        $this->application = $application ?? $this->resolveApplication();
+    }
+
+    public function setApplication(?Application $application): void
+    {
+        $this->application = $application;
     }
 
     public function basePath(): string
     {
-        return $this->basePath;
+        return $this->config->basePath();
     }
 
     public function manifestPath(): string
     {
-        return $this->manifest->path();
+        return $this->registry->manifest()->path();
     }
 
     public function isCached(): bool
     {
-        return $this->manifest->exists();
+        return $this->registry->manifest()->exists();
     }
 
     /**
@@ -64,7 +70,7 @@ class ModuleManager
      */
     public function all(): Collection
     {
-        return Collection::make(array_values($this->modules));
+        return $this->registry->all();
     }
 
     /**
@@ -85,13 +91,7 @@ class ModuleManager
 
     public function module(string $id): ModuleDescriptor
     {
-        $module = $this->modules[$id] ?? null;
-
-        if (! $module) {
-            throw new InvalidArgumentException(sprintf('Module [%s] is not registered in the orchestrator manifest.', $id));
-        }
-
-        return $module;
+        return $this->registry->get($id);
     }
 
     public function path(string $id, ?string $subPath = null): string
@@ -111,31 +111,34 @@ class ModuleManager
 
     public function install(string $id): void
     {
-        $module = $this->module($id);
-        $module->markInstalled(true);
-        $module->markEnabled($module->isEnabled() || ($this->config['auto_enable'] ?? true));
-        $this->persist();
+        $module = $this->registry->setInstalled($id, true);
+
+        if (! $module->isEnabled() && $this->config->autoEnable()) {
+            $module->markEnabled(true);
+        }
+
+        $this->registry->persist();
+        $this->registerModuleProviders($module);
     }
 
     public function uninstall(string $id, bool $dropData = false): void
     {
-        $module = $this->module($id);
+        $module = $this->registry->setInstalled($id, false);
         $module->uninstall();
-        $this->persist();
+        $this->registry->persist();
     }
 
     public function enable(string $id): void
     {
-        $module = $this->module($id);
-        $module->markEnabled(true);
-        $this->persist();
+        $module = $this->registry->setEnabled($id, true);
+        $this->registry->persist();
+        $this->registerModuleProviders($module);
     }
 
     public function disable(string $id): void
     {
-        $module = $this->module($id);
-        $module->markEnabled(false);
-        $this->persist();
+        $this->registry->setEnabled($id, false);
+        $this->registry->persist();
     }
 
     /**
@@ -181,383 +184,109 @@ class ModuleManager
             $arguments['--class'] = $class;
         }
 
+        if (! $class && is_string($seeders) && $seeders !== '') {
+            $arguments['--class'] = $this->resolveDefaultSeeder($seeders, $module->extra());
+        }
+
         /** @var \Illuminate\Support\Facades\Artisan $artisan */
         $artisan = app('artisan');
         $artisan->call('db:seed', $arguments);
     }
 
+    /**
+     * @return array<string, ModuleDescriptor>
+     */
     public function discover(bool $writeManifest = true): array
     {
-        $this->modules = $this->discoverModules();
+        return $this->registry->refresh($writeManifest);
+    }
 
-        if ($writeManifest) {
-            $this->persist();
-        }
-
-        return $this->modules;
+    /**
+     * @return array<string, ModuleDescriptor>
+     */
+    public function reload(bool $writeManifest = true): array
+    {
+        return $this->discover($writeManifest);
     }
 
     public function cache(): void
     {
-        $this->persist();
+        $this->registry->persist();
     }
 
     public function clearCache(): void
     {
-        $this->manifest->delete();
+        $this->registry->clear();
     }
 
-    protected function persist(): void
+    public function registerEnabledModules(?Application $application = null): void
     {
-        $payload = [];
-
-        foreach ($this->modules as $module) {
-            $payload[$module->id()] = $module->toArray();
+        if ($application) {
+            $this->application = $application;
         }
 
-        $this->manifest->write($payload);
+        foreach ($this->enabledModules() as $module) {
+            $this->registerModuleProviders($module);
+        }
+    }
+
+    protected function registerModuleProviders(ModuleDescriptor $module): void
+    {
+        if (! $module->isEnabled()) {
+            return;
+        }
+
+        $app = $this->application;
+
+        if (! $app) {
+            return;
+        }
+
+        foreach ($module->providers() as $provider) {
+            if (! is_string($provider) || $provider === '' || isset($this->registeredProviders[$provider])) {
+                continue;
+            }
+
+            if (! class_exists($provider)) {
+                continue;
+            }
+
+            $app->register($provider);
+            $this->registeredProviders[$provider] = true;
+        }
+    }
+
+    protected function resolveApplication(): ?Application
+    {
+        if (! function_exists('app')) {
+            return null;
+        }
+
+        $application = app();
+
+        return $application instanceof Application ? $application : null;
     }
 
     /**
-     * @return array<string, ModuleDescriptor>
+     * @param  array<string, mixed>  $extra
      */
-    protected function loadCachedModules(): array
+    protected function resolveDefaultSeeder(string $seeders, array $extra): string
     {
-        if (! $this->manifest->exists()) {
-            return [];
+        $seeders = trim($seeders, '\\/');
+
+        if (isset($extra['default_seeder']) && is_string($extra['default_seeder']) && $extra['default_seeder'] !== '') {
+            return $extra['default_seeder'];
         }
 
-        $data = $this->manifest->load();
-        $modules = [];
+        $segments = explode('/', $seeders);
+        $name = Arr::last($segments) ?: 'DatabaseSeeder';
+        $name = str_replace(['-', '_'], ' ', $name);
+        $name = str_replace(' ', '', ucwords($name));
 
-        foreach ($data as $attributes) {
-            if (! is_array($attributes) || ! isset($attributes['id'])) {
-                continue;
-            }
-
-            $descriptor = ModuleDescriptor::fromArray($attributes);
-            $modules[$descriptor->id()] = $descriptor;
+        if (! str_ends_with($name, 'Seeder')) {
+            $name .= 'Seeder';
         }
 
-        return $modules;
-    }
-
-    /**
-     * @return array<string, ModuleDescriptor>
-     */
-    protected function discoverModules(): array
-    {
-        $state = [];
-
-        foreach ($this->modules as $module) {
-            $state[$module->id()] = [
-                'installed' => $module->isInstalled(),
-                'enabled' => $module->isEnabled(),
-            ];
-        }
-
-        foreach ($this->manifest->load() as $attributes) {
-            if (! is_array($attributes) || ! isset($attributes['id'])) {
-                continue;
-            }
-
-            $state[$attributes['id']] = [
-                'installed' => (bool) ($attributes['installed'] ?? ($this->config['auto_install'] ?? true)),
-                'enabled' => (bool) ($attributes['enabled'] ?? ($this->config['auto_enable'] ?? true)),
-            ];
-        }
-
-        $modules = [];
-
-        foreach ($this->discoverFromComposer() as $module) {
-            $override = $state[$module->id()] ?? null;
-
-            if ($override) {
-                $module->markInstalled($override['installed']);
-                $module->markEnabled($override['enabled']);
-            }
-
-            $modules[$module->id()] = $module;
-        }
-
-        foreach ($this->discoverFromModuleJson() as $module) {
-            if (isset($modules[$module->id()])) {
-                continue;
-            }
-
-            $override = $state[$module->id()] ?? null;
-
-            if ($override) {
-                $module->markInstalled($override['installed']);
-                $module->markEnabled($override['enabled']);
-            }
-
-            $modules[$module->id()] = $module;
-        }
-
-        ksort($modules);
-
-        return $modules;
-    }
-
-    /**
-     * @return array<int, ModuleDescriptor>
-     */
-    protected function discoverFromComposer(): array
-    {
-        $packages = $this->readComposerPackages();
-        $modules = [];
-
-        foreach ($packages as $package) {
-            if (! is_array($package)) {
-                continue;
-            }
-
-            $meta = Arr::get($package, 'extra.glugox-module', []);
-
-            if (($package['type'] ?? null) !== 'laravel-module' && empty($meta)) {
-                continue;
-            }
-
-            $id = $meta['id'] ?? $package['name'] ?? null;
-
-            if (! is_string($id) || $id === '') {
-                continue;
-            }
-
-            $modules[] = new ModuleDescriptor(
-                $id,
-                $meta['name'] ?? ($package['name'] ?? $id),
-                $meta['version'] ?? ($package['version'] ?? $package['pretty_version'] ?? '0.0.0'),
-                (bool) ($this->config['auto_install'] ?? true),
-                (bool) ($this->config['auto_enable'] ?? true),
-                $this->resolveInstallPath($package),
-                $this->normalisePaths($meta),
-                $this->normaliseProviders(Arr::get($package, 'extra.laravel.providers', [])),
-                $this->normaliseArray($meta['capabilities'] ?? []),
-                is_array($meta) ? $meta : []
-            );
-        }
-
-        return $modules;
-    }
-
-    /**
-     * @return array<int, ModuleDescriptor>
-     */
-    protected function discoverFromModuleJson(): array
-    {
-        $paths = $this->config['module_json_paths'] ?? [];
-        $modules = [];
-
-        foreach ($paths as $pattern) {
-            $pattern = $this->absolutePath($pattern);
-            $files = glob($pattern) ?: [];
-
-            foreach ($files as $file) {
-                $json = json_decode((string) file_get_contents($file), true);
-
-                if (! is_array($json) || ! isset($json['id'])) {
-                    continue;
-                }
-
-                $modules[] = new ModuleDescriptor(
-                    $json['id'],
-                    $json['name'] ?? $json['id'],
-                    $json['version'] ?? '0.0.0',
-                    (bool) ($this->config['auto_install'] ?? true),
-                    (bool) ($this->config['auto_enable'] ?? true),
-                    $this->canonicalizePath(dirname($file)),
-                    $this->normalisePaths($json),
-                    $this->normaliseArray($json['providers'] ?? []),
-                    $this->normaliseArray($json['capabilities'] ?? []),
-                    $json
-                );
-            }
-        }
-
-        return $modules;
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    protected function readComposerPackages(): array
-    {
-        if (! is_file($this->installedPath)) {
-            return [];
-        }
-
-        $json = json_decode((string) file_get_contents($this->installedPath), true);
-
-        if (! is_array($json)) {
-            return [];
-        }
-
-        if (isset($json['packages']) && is_array($json['packages'])) {
-            return $json['packages'];
-        }
-
-        if (Arr::isAssoc($json) && isset($json['name'])) {
-            return [$json];
-        }
-
-        $packages = [];
-
-        foreach ($json as $entry) {
-            if (isset($entry['packages']) && is_array($entry['packages'])) {
-                $packages = array_merge($packages, $entry['packages']);
-            } elseif (is_array($entry) && isset($entry['name'])) {
-                $packages[] = $entry;
-            }
-        }
-
-        return $packages;
-    }
-
-    protected function resolveBasePath(?string $configured): string
-    {
-        if (is_string($configured) && $configured !== '') {
-            return $this->canonicalizePath($configured);
-        }
-
-        if (function_exists('base_path')) {
-            return base_path();
-        }
-
-        $cwd = getcwd();
-
-        if (! is_string($cwd) || $cwd === '') {
-            throw new RuntimeException('Unable to determine application base path for the orchestrator.');
-        }
-
-        return $cwd;
-    }
-
-    protected function resolveInstallPath(array $package): string
-    {
-        $path = $package['install_path'] ?? $package['install-path'] ?? null;
-
-        if (is_string($path) && $path !== '') {
-            $composerDir = dirname($this->installedPath);
-            $candidate = $this->canonicalizePath($composerDir.DIRECTORY_SEPARATOR.$path);
-
-            if ($candidate !== '') {
-                return $candidate;
-            }
-        }
-
-        $name = $package['name'] ?? null;
-
-        if (is_string($name) && $name !== '') {
-            return $this->absolutePath('vendor/'.$name);
-        }
-
-        return $this->basePath;
-    }
-
-    protected function absolutePath(string $path): string
-    {
-        if ($this->isAbsolutePath($path)) {
-            return $this->canonicalizePath($path);
-        }
-
-        return $this->canonicalizePath($this->basePath.DIRECTORY_SEPARATOR.$path);
-    }
-
-    protected function isAbsolutePath(string $path): bool
-    {
-        return Str::startsWith($path, ['/', '\\']) || (strlen($path) > 1 && $path[1] === ':');
-    }
-
-    protected function canonicalizePath(string $path): string
-    {
-        $path = str_replace(['\\', '/'], DIRECTORY_SEPARATOR, $path);
-        $segments = explode(DIRECTORY_SEPARATOR, $path);
-        $stack = [];
-        $prefix = '';
-
-        if ($path !== '' && ($path[0] ?? '') === DIRECTORY_SEPARATOR) {
-            $prefix = DIRECTORY_SEPARATOR;
-        } elseif (isset($segments[0]) && Str::contains($segments[0], ':')) {
-            $prefix = array_shift($segments).DIRECTORY_SEPARATOR;
-        }
-
-        foreach ($segments as $segment) {
-            if ($segment === '' || $segment === '.') {
-                continue;
-            }
-
-            if ($segment === '..') {
-                array_pop($stack);
-                continue;
-            }
-
-            $stack[] = $segment;
-        }
-
-        $resolved = implode(DIRECTORY_SEPARATOR, $stack);
-
-        return $prefix.$resolved;
-    }
-
-    /**
-     * @param  array<int|string, mixed>  $values
-     * @return array<int, string>
-     */
-    protected function normaliseArray(array $values): array
-    {
-        $result = [];
-
-        foreach ($values as $value) {
-            if (is_string($value) && $value !== '') {
-                $result[] = $value;
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * @param  mixed  $providers
-     * @return array<int, string>
-     */
-    protected function normaliseProviders($providers): array
-    {
-        if (is_string($providers)) {
-            return [$providers];
-        }
-
-        if (! is_array($providers)) {
-            return [];
-        }
-
-        return $this->normaliseArray($providers);
-    }
-
-    /**
-     * @param  array<string, mixed>  $meta
-     * @return array<string, mixed>
-     */
-    protected function normalisePaths(array $meta): array
-    {
-        $paths = [];
-        $keys = ['routes', 'migrations', 'seeds', 'views', 'translations'];
-
-        foreach ($keys as $key) {
-            if (! array_key_exists($key, $meta)) {
-                continue;
-            }
-
-            $value = $meta[$key];
-
-            if (is_array($value)) {
-                $paths[$key] = array_values(array_filter($value, fn ($path) => is_string($path) && $path !== ''));
-            } elseif (is_string($value) && $value !== '') {
-                $paths[$key] = $value;
-            }
-        }
-
-        return $paths;
+        return $name;
     }
 }
