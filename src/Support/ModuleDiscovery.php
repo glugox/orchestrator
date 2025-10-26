@@ -3,7 +3,9 @@
 namespace Glugox\Orchestrator\Support;
 
 use Glugox\Orchestrator\ModuleDescriptor;
+use Glugox\Orchestrator\SpecDescriptor;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 
 class ModuleDiscovery
 {
@@ -31,6 +33,45 @@ class ModuleDiscovery
         }
 
         ksort($modules);
+
+        return $modules;
+    }
+
+    /**
+     * Discover from specs files.
+     *
+     * @return array<int, SpecDescriptor>
+     */
+    public function discoverSpecs(): array
+    {
+        $modules = [];
+        $files = glob($this->config->moduleSpecsPath().'/*.json') ?: [];
+        foreach ($files as $file) {
+            $json = json_decode((string)file_get_contents($file), true);
+            $jsonApp = $json['app'] ?? null;
+
+            // Check if it is disabled
+            if (is_array($jsonApp) && isset($jsonApp['disabled']) && $jsonApp['disabled'] === true) {
+                continue;
+            }
+
+
+            if (!is_array($jsonApp) || !isset($jsonApp['name'])) {
+                throw new \RuntimeException(sprintf('Invalid module spec file: %s, name or module must be set', $file));
+            }
+
+            $vendor = $jsonApp['vendor'] ?? $this->config->defaultVendor();
+            $vendorPrefix = strtolower($vendor);
+            $moduleShortName = strtolower(explode('/', $jsonApp['name'])[1] ?? $jsonApp['name']);
+            $id = $vendorPrefix . '/' . $moduleShortName;
+
+            $modules[] = new SpecDescriptor(
+                $id,
+                $jsonApp['name'],
+                $vendor . '\\' . Str::studly($moduleShortName),
+                $file,
+            );
+        }
 
         return $modules;
     }

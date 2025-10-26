@@ -16,6 +16,11 @@ class ModuleRegistry
      */
     protected array $modules = [];
 
+    /**
+     * @var array<string, mixed>
+     */
+    protected array $specs = [];
+
     public function __construct(
         protected OrchestratorConfig $config,
         protected ModuleDiscovery $discovery,
@@ -46,6 +51,14 @@ class ModuleRegistry
     public function all(): Collection
     {
         return Collection::make(array_values($this->modules));
+    }
+
+    /**
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function specs(): Collection
+    {
+        return Collection::make($this->specs);
     }
 
     public function get(string $id): ModuleDescriptor
@@ -123,6 +136,18 @@ class ModuleRegistry
         ksort($modules);
 
         $this->modules = $modules;
+
+
+        // Specs
+
+        $specs = [];
+        foreach ($this->discovery->discoverSpecs() as $spec) {
+            $specs[$spec->id()] = $spec;
+        }
+
+        ksort($specs);
+        $this->specs = $specs;
+
 
         if ($writeManifest) {
             $this->persist();

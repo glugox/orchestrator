@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 class DisableModuleCommand extends Command
 {
-    protected $signature = 'modules:disable {module : The module identifier}';
+    protected $signature = 'orchestrator:disable {module : The module identifier}';
 
     protected $description = 'Disable a module while keeping it installed.';
 

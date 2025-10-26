@@ -15,6 +15,7 @@ function orchestratorConfig(string $basePath, array $overrides = []): array
         'manifest_path' => 'bootstrap/cache/modules.php',
         'installed_path' => 'vendor/composer/installed.json',
         'module_json_paths' => ['modules/*/module.json'],
+        'module_specs_path' => 'specs/modules',
         'auto_install' => true,
         'auto_enable' => true,
     ], $overrides);

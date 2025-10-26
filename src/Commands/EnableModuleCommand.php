@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 class EnableModuleCommand extends Command
 {
-    protected $signature = 'modules:enable {module : The module identifier} {--install : Install the module before enabling it}';
+    protected $signature = 'orchestrator:enable {module : The module identifier} {--install : Install the module before enabling it}';
 
     protected $description = 'Enable a module and register its service providers.';
 

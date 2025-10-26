@@ -9,9 +9,11 @@
     "modules"
   ],
   "type": "library",
+  "version": "1.0.0",
   "require": {
     "php": ">=8.2",
-    "glugox/module": "^1.0"
+    "glugox/module": "^1.0",
+    "glugox/module-generator": "^1.0"
   },
   "require-dev": {
     "driftingly/rector-laravel": "^2.0.7",
@@ -51,6 +53,9 @@
   ],
   "extra": {
     "laravel": {
+      "providers": [
+        "Glugox\\Orchestrator\\OrchestratorServiceProvider"
+      ],
       "dont-discover": []
     }
   },
@@ -67,6 +72,13 @@
     {
       "type": "path",
       "url": "../module",
+      "options": {
+        "symlink": true
+      }
+    },
+    {
+      "type": "path",
+      "url": "./module-generator",
       "options": {
         "symlink": true
       }

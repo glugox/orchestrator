@@ -55,6 +55,11 @@ class ModuleManager
         return $this->config->basePath();
     }
 
+    public function modulesPath(): string
+    {
+        return $this->config->modulesPath();
+    }
+
     public function manifestPath(): string
     {
         return $this->registry->manifest()->path();
@@ -71,6 +76,14 @@ class ModuleManager
     public function all(): Collection
     {
         return $this->registry->all();
+    }
+
+    /**
+     * @return Collection<int, SpecDescriptor>
+     */
+    public function specs(): Collection
+    {
+        return $this->registry->specs();
     }
 
     /**

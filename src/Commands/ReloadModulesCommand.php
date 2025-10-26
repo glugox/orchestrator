@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 
 class ReloadModulesCommand extends Command
 {
-    protected $signature = 'modules:reload {--no-cache : Do not write the manifest after reloading modules}';
+    protected $signature = 'orchestrator:reload {--no-cache : Do not write the manifest after reloading modules}';
 
     protected $description = 'Flush the manifest cache and rediscover available modules.';
 

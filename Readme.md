@@ -16,13 +16,13 @@ connects everything at runtime inside the main Laravel app.
 
 ```
 ┌────────────────────┐         ┌────────────────────┐         ┌────────────────────┐
-│  Main Laravel App  │────┬──▶ │  glugox/orchestr. │ ───────▶ │    Module Runtime  │
+│  Main Laravel App  │────┬──▶ │  glugox/orchestr.  │ ───────▶│    Module Runtime  │
 └────────────────────┘    │    └────────────────────┘         │ (Routes, Migrations│
-                          │                                    │  Providers, etc.)  │
+                          │                                   │  Providers, etc.)  │
                           │    ┌────────────────────┐         └────────────────────┘
                           └──▶ │  glugox/module     │ ◀────┐
                                └────────────────────┘      │
-                                                            │
+                                                           │
                                ┌────────────────────┐      │
                                │ glugox/module-gen. │ ─────┘
                                └────────────────────┘

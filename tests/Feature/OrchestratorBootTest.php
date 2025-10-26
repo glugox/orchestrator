@@ -28,8 +28,8 @@ it('registers service providers for enabled modules on boot', function () {
         }
 
         expect(FakeModuleServiceProvider::$events)->toContain('register')
-            ->and(FakeModuleServiceProvider::$events)->toContain('boot');
-        expect($manager->isEnabled('vendor/foo-module'))->toBeTrue();
+            ->and(FakeModuleServiceProvider::$events)->toContain('boot')
+            ->and($manager->isEnabled('vendor/foo-module'))->toBeTrue();
     } finally {
         cleanupSandbox($sandbox);
         FakeModuleServiceProvider::reset();

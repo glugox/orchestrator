@@ -15,6 +15,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Where we keep the json only configuration specifications for modules ready to be built
+    |--------------------------------------------------------------------------
+    |
+    | You may specify a custom path where your module specifications are stored.
+    | This is useful if you want to keep them outside of the default location.
+    | The path should be relative to the base path of the application.
+    */
+    'module_specs_path' => 'specs/modules',
+
+    /*
+    |--------------------------------------------------------------------------
     | Manifest Path
     |--------------------------------------------------------------------------
     |
@@ -46,8 +57,30 @@ return [
     'module_json_paths' => [
         'vendor/*/*/module.json',
         'modules/*/module.json',
+        'modules/*/*/module.json',
         'packages/*/*/module.json',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Modules Default Vendor
+    |--------------------------------------------------------------------------
+    |
+    | When a module is discovered without an explicit namespace, the orchestrator
+    | will assign it this default namespace. You may customise it here.
+     */
+    'default_vendor' => 'Glugox',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Modules Default Path
+    |--------------------------------------------------------------------------
+    |
+    | When a module is discovered without an explicit path, the orchestrator
+    | will assign it this default path relative to the base path. You may
+    | customise it here.
+     */
+    'modules_default_path' => 'modules',
 
     /*
     |--------------------------------------------------------------------------

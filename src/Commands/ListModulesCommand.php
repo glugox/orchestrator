@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 
 class ListModulesCommand extends Command
 {
-    protected $signature = 'modules:list';
+    protected $signature = 'orchestrator:list';
 
     protected $description = 'Display the discovered modules and their status.';
 

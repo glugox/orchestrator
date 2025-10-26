@@ -6,9 +6,16 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use RuntimeException;
 
+/**
+ * This class handles the configuration settings for the Orchestrator.
+ * It resolves paths and normalizes configuration options.
+ * It provides methods to access these settings throughout the application.
+ */
 class OrchestratorConfig
 {
     protected string $basePath;
+
+    protected string $modulesPath;
 
     protected string $manifestPath;
 
@@ -19,9 +26,16 @@ class OrchestratorConfig
      */
     protected array $moduleJsonPatterns;
 
+    /**
+     * @var string
+     */
+    protected string $moduleSpecsPath;
+
     protected bool $autoInstall;
 
     protected bool $autoEnable;
+
+    protected $defaultVendor;
 
     /**
      * @param  array<string, mixed>  $config
@@ -29,16 +43,29 @@ class OrchestratorConfig
     public function __construct(array $config)
     {
         $this->basePath = $this->resolveBasePath($config['base_path'] ?? null);
+        $this->modulesPath = $this->absolutePath($config['modules_default_path'] ?? 'modules');
         $this->manifestPath = $this->absolutePath($config['manifest_path'] ?? 'bootstrap/cache/modules.php');
         $this->installedJsonPath = $this->absolutePath($config['installed_path'] ?? 'vendor/composer/installed.json');
         $this->moduleJsonPatterns = $this->normalisePatterns($config['module_json_paths'] ?? []);
+        $this->moduleSpecsPath = $this->absolutePath($config['module_specs_path'] ?? 'specs/modules');
         $this->autoInstall = (bool) ($config['auto_install'] ?? true);
         $this->autoEnable = (bool) ($config['auto_enable'] ?? true);
+        $this->defaultVendor = $config['default_vendor'] ?? null;
     }
 
     public function basePath(): string
     {
         return $this->basePath;
+    }
+
+    public function modulesPath(): string
+    {
+        return $this->modulesPath;
+    }
+
+    public function defaultVendor()
+    {
+        return $this->defaultVendor;
     }
 
     public function manifestPath(): string
@@ -57,6 +84,14 @@ class OrchestratorConfig
     public function moduleJsonPatterns(): array
     {
         return $this->moduleJsonPatterns;
+    }
+
+    /**
+     * @return bool
+     */
+    public function moduleSpecsPath(): string
+    {
+        return $this->moduleSpecsPath;
     }
 
     public function autoInstall(): bool
