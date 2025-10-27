@@ -25,8 +25,21 @@ class ModuleInstaller
      */
     public function install(string $packageName, ?string $localPath = null, string $version = '@dev'): void
     {
+        $alreadyRequired = $this->isPackageAlreadyRequired($packageName);
+        $repositoryUpdated = false;
+
         if ($localPath && is_dir($localPath)) {
-            $this->ensureLocalRepository($localPath);
+            $repositoryUpdated = $this->ensureLocalRepository($localPath);
+        }
+
+        if ($alreadyRequired) {
+            Log::info("Package {$packageName} already required; skipping composer require.");
+
+            if ($repositoryUpdated) {
+                $this->dumpAutoload();
+            }
+
+            return;
         }
 
         $this->requirePackage($packageName, $version);
@@ -36,13 +49,9 @@ class ModuleInstaller
     /**
      * Ensure a local module is registered as a path repository in composer.json
      */
-    protected function ensureLocalRepository(string $localPath): void
+    protected function ensureLocalRepository(string $localPath): bool
     {
-        if (! file_exists($this->composerJsonPath)) {
-            throw new RuntimeException("composer.json not found at {$this->composerJsonPath}");
-        }
-
-        $composer = json_decode(file_get_contents($this->composerJsonPath), true) ?? [];
+        $composer = $this->loadComposerJson();
         $repositories = $composer['repositories'] ?? [];
 
         $repoEntry = [
@@ -54,7 +63,7 @@ class ModuleInstaller
         // Already present?
         foreach ($repositories as $repo) {
             if (($repo['type'] ?? '') === 'path' && ($repo['url'] ?? '') === $localPath) {
-                return;
+                return false;
             }
         }
 
@@ -63,12 +72,27 @@ class ModuleInstaller
         $composer['minimum-stability'] = $composer['minimum-stability'] ?? 'dev';
         $composer['prefer-stable'] = $composer['prefer-stable'] ?? true;
 
-        file_put_contents(
-            $this->composerJsonPath,
-            json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-        );
+        $this->saveComposerJson($composer);
 
         Log::info("Added local repository for {$localPath} to composer.json");
+
+        return true;
+    }
+
+    /**
+     * Determine whether the package already exists in composer.json.
+     */
+    protected function isPackageAlreadyRequired(string $packageName): bool
+    {
+        if (! file_exists($this->composerJsonPath)) {
+            return false;
+        }
+
+        $composer = $this->loadComposerJson();
+        $requires = $composer['require'] ?? [];
+        $devRequires = $composer['require-dev'] ?? [];
+
+        return isset($requires[$packageName]) || isset($devRequires[$packageName]);
     }
 
     /**
@@ -109,5 +133,30 @@ class ModuleInstaller
         if (! $process->isSuccessful()) {
             throw new RuntimeException("Composer command failed: " . $process->getErrorOutput());
         }
+    }
+
+    /**
+     * Load composer.json from disk.
+     */
+    protected function loadComposerJson(): array
+    {
+        if (! file_exists($this->composerJsonPath)) {
+            throw new RuntimeException("composer.json not found at {$this->composerJsonPath}");
+        }
+
+        $decoded = json_decode(file_get_contents($this->composerJsonPath), true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * Persist composer.json to disk.
+     */
+    protected function saveComposerJson(array $composer): void
+    {
+        file_put_contents(
+            $this->composerJsonPath,
+            json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+        );
     }
 }
