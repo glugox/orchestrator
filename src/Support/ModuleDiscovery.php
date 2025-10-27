@@ -143,7 +143,7 @@ class ModuleDiscovery
                     $this->config->autoEnable(),
                     $this->config->canonicalizePath(dirname($file)),
                     $this->normalisePaths($json),
-                    $this->normaliseArray($json['providers'] ?? []),
+                    $this->normaliseArray( $json['providers'] ?? []),
                     $this->normaliseArray($json['capabilities'] ?? []),
                     $json
                 );

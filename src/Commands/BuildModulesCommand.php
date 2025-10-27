@@ -14,25 +14,29 @@ class BuildModulesCommand extends Command
 
     public function handle(ModuleManager $modules): int
     {
+        $modulesSpecs = [];
         $id = (string) $this->argument('module');
         $modules->reload();
 
         // Find all available modules specs from ./specs/*.json
-        if (empty($id)) {
-            $this->info('Building all modules...');
-
-            foreach ($modules->specs() as $spec) {
-                $this->info(sprintf('Building module [%s]...', $spec->toString()));
-                // magic:build --package-path ./modules/glugox/module-a --package-name glugox/module-a --package-namespace Glugox\\ModuleA --starter orchestrator
-                $this->call('magic:build', [
-                    '--package-path' => $modules->modulesPath().'/'.$spec->id(),
-                    '--package-name' => $spec->id(),
-                    '--package-namespace' => $spec->namespace(),
-                    '--config' => $spec->configPath(),
-                ]);
+        foreach ($modules->specs() as $spec) {
+            // Check passed id
+            if (!empty($id) && $spec->id() !== $id) {
+                continue;
             }
+            $modulesSpecs[] = $spec->id();
         }
 
+        foreach ($modulesSpecs as $spec) {
+            $this->info(sprintf('Building module [%s]...', $spec->toString()));
+            // magic:build --package-path ./modules/glugox/module-a --package-name glugox/module-a --package-namespace Glugox\\ModuleA --starter orchestrator
+            $this->call('magic:build', [
+                '--package-path' => $modules->modulesPath().'/'.$spec->id(),
+                '--package-name' => $spec->id(),
+                '--package-namespace' => $spec->namespace(),
+                '--config' => $spec->configPath(),
+            ]);
+        }
 
         try {
             // Enable the module

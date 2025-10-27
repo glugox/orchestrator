@@ -2,6 +2,7 @@
 
 namespace Glugox\Orchestrator;
 
+use Glugox\Orchestrator\Services\ModuleInstaller;
 use Glugox\Orchestrator\Services\ModuleRegistry;
 use Glugox\Orchestrator\Support\ModuleDiscovery;
 use Glugox\Orchestrator\Support\OrchestratorConfig;
@@ -124,7 +125,17 @@ class ModuleManager
 
     public function install(string $id): void
     {
-        $module = $this->registry->setInstalled($id, true);
+        $module = $this->registry->get($id);
+
+        $installer = app(ModuleInstaller::class);
+
+        // Always treat as composer package
+        $installer->install(
+            $module->id(),   // e.g. "glugox/crm"
+            $module->path()            // local path to /modules/Glugox/Crm
+        );
+
+        $this->registry->setInstalled($id, true);
 
         if (! $module->isEnabled() && $this->config->autoEnable()) {
             $module->markEnabled(true);
