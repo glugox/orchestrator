@@ -12,6 +12,8 @@ composer create-project laravel/laravel "$APP_DIR"
 
 cd "$APP_DIR"
 
+composer config minimum-stability dev
+
 composer require glugox/orchestrator:@dev
 
 php artisan vendor:publish --tag=orchestrator-config --force
