@@ -8,11 +8,15 @@ use RuntimeException;
 
 class ModuleInstaller
 {
-    protected string $composerJsonPath;
+    private const DEFAULT_MODULE_VERSION = '^1.0';
 
-    public function __construct(string $composerJsonPath = null)
+    protected string $composerJsonPath;
+    protected string $defaultModuleVersion;
+
+    public function __construct(string $composerJsonPath = null, ?string $defaultModuleVersion = null)
     {
         $this->composerJsonPath = $composerJsonPath ?? base_path('composer.json');
+        $this->defaultModuleVersion = $defaultModuleVersion ?? $this->resolveDefaultModuleVersion();
     }
 
     /**
@@ -20,10 +24,10 @@ class ModuleInstaller
      *
      * @param  string       $packageName   e.g. "glugox/crm"
      * @param  string|null  $localPath     e.g. "modules/Glugox/Crm"
-     * @param  string       $version       e.g. "@dev" or "^1.0"
+     * @param  string|null  $version       e.g. "@dev" or "^1.0"
      * @return void
      */
-    public function install(string $packageName, ?string $localPath = null, string $version = '@dev'): void
+    public function install(string $packageName, ?string $localPath = null, ?string $version = null): void
     {
         $alreadyRequired = $this->isPackageAlreadyRequired($packageName);
         $repositoryUpdated = false;
@@ -42,7 +46,7 @@ class ModuleInstaller
             return;
         }
 
-        $this->requirePackage($packageName, $version);
+        $this->requirePackage($packageName, $version ?? $this->defaultModuleVersion);
         $this->dumpAutoload();
     }
 
@@ -135,6 +139,19 @@ class ModuleInstaller
         }
     }
 
+    protected function resolveDefaultModuleVersion(): string
+    {
+        if (function_exists('config')) {
+            $configured = config('orchestrator.modules_default_version');
+
+            if (is_string($configured) && $configured !== '') {
+                return $configured;
+            }
+        }
+
+        return self::DEFAULT_MODULE_VERSION;
+    }
+
     /**
      * Load composer.json from disk.
      */
@@ -160,3 +177,4 @@ class ModuleInstaller
         );
     }
 }
+

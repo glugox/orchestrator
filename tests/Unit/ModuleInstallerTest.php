@@ -55,7 +55,7 @@ it('runs composer require for new packages', function () {
         $installer->install('vendor/foo-module', $modulePath);
 
         expect($installer->commands)->toMatchArray([
-            ['require', 'vendor/foo-module:@dev'],
+            ['require', 'vendor/foo-module:^1.0'],
             ['dump-autoload'],
         ]);
 
@@ -64,6 +64,34 @@ it('runs composer require for new packages', function () {
         expect($composer['repositories'][0]['url'] ?? null)->toBe($modulePath)
             ->and($composer['minimum-stability'])->toBe('dev')
             ->and($composer['prefer-stable'])->toBeTrue();
+    } finally {
+        cleanupSandbox($sandbox);
+    }
+});
+
+it('allows overriding the default version constraint', function () {
+    $sandbox = createSandbox();
+
+    try {
+        $composerPath = $sandbox.'/composer.json';
+        $modulePath = $sandbox.'/modules/Vendor/Foo';
+
+        mkdir($modulePath, 0777, true);
+
+        file_put_contents(
+            $composerPath,
+            json_encode([], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+        );
+
+        $installer = new FakeModuleInstaller($composerPath, '~2.0');
+        $installer->install('vendor/foo-module', $modulePath);
+
+        expect($installer->commands[0] ?? [])->toBe(['require', 'vendor/foo-module:~2.0']);
+
+        $installer->commands = [];
+        $installer->install('vendor/foo-module', $modulePath, '^3.1');
+
+        expect($installer->commands[0] ?? [])->toBe(['require', 'vendor/foo-module:^3.1']);
     } finally {
         cleanupSandbox($sandbox);
     }
