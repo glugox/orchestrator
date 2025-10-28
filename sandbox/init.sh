@@ -2,16 +2,13 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-APP_DIR="$REPO_ROOT/laravel-app"
+APP_DIR="$SCRIPT_DIR/laravel-app"
 
 if [ -d "$APP_DIR" ]; then
     rm -rf "$APP_DIR"
 fi
 
-cd "$REPO_ROOT"
-
-composer create-project laravel/laravel laravel-app
+composer create-project laravel/laravel "$APP_DIR"
 
 cd "$APP_DIR"
 
