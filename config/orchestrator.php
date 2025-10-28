@@ -79,8 +79,20 @@ return [
     | When a module is discovered without an explicit path, the orchestrator
     | will assign it this default path relative to the base path. You may
     | customise it here.
-     */
+    */
     'modules_default_path' => 'modules',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Modules Default Version Constraint
+    |--------------------------------------------------------------------------
+    |
+    | When installing new modules through the orchestrator we will require the
+    | package using this version constraint unless an explicit version is
+    | provided. This allows you to control the preferred stability for new
+    | module dependencies.
+    */
+    'modules_default_version' => '^1.0',
 
     /*
     |--------------------------------------------------------------------------
