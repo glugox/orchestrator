@@ -12,8 +12,8 @@
   "version": "1.0.0",
   "require": {
     "php": ">=8.2",
-    "glugox/module": "^1.0",
-    "glugox/module-generator": "^1.0"
+    "glugox/module": "@dev",
+    "glugox/magic": "@dev"
   },
   "require-dev": {
     "driftingly/rector-laravel": "^2.0.7",
