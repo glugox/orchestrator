@@ -5,8 +5,45 @@ namespace Glugox\Orchestrator;
 use Illuminate\Contracts\Support\Arrayable;
 use function is_dir;
 
+/**
+ * @phpstan-type ModuleDescriptorPayload array{
+ *     id: string,
+ *     name?: string|null,
+ *     version?: string|null,
+ *     installed?: bool,
+ *     enabled?: bool,
+ *     base_path?: string|null,
+ *     paths?: array<string, mixed>,
+ *     providers?: array<int|string, mixed>,
+ *     capabilities?: array<int|string, mixed>,
+ *     extra?: array<string, mixed>
+ * }
+ * @phpstan-type ModuleDescriptorArray array{
+ *     id: string,
+ *     name: string,
+ *     version: string,
+ *     installed: bool,
+ *     enabled: bool,
+ *     base_path: string,
+ *     paths: array<string, mixed>,
+ *     providers: array<int, string>,
+ *     capabilities: array<int, string>,
+ *     extra: array<string, mixed>
+ * }
+ */
 class ModuleDescriptor implements Arrayable
 {
+    public const ATTRIBUTE_ID = 'id';
+    public const ATTRIBUTE_NAME = 'name';
+    public const ATTRIBUTE_VERSION = 'version';
+    public const ATTRIBUTE_INSTALLED = 'installed';
+    public const ATTRIBUTE_ENABLED = 'enabled';
+    public const ATTRIBUTE_BASE_PATH = 'base_path';
+    public const ATTRIBUTE_PATHS = 'paths';
+    public const ATTRIBUTE_PROVIDERS = 'providers';
+    public const ATTRIBUTE_CAPABILITIES = 'capabilities';
+    public const ATTRIBUTE_EXTRA = 'extra';
+
     protected bool $installed;
     protected bool $enabled;
 
@@ -168,38 +205,41 @@ class ModuleDescriptor implements Arrayable
         return rtrim($this->basePath, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.ltrim($subPath, DIRECTORY_SEPARATOR);
     }
 
+    /**
+     * @return ModuleDescriptorArray
+     */
     public function toArray(): array
     {
         return [
-            'id' => $this->id,
-            'name' => $this->name,
-            'version' => $this->version,
-            'installed' => $this->installed,
-            'enabled' => $this->enabled,
-            'base_path' => $this->basePath,
-            'paths' => $this->paths,
-            'providers' => $this->providers,
-            'capabilities' => $this->capabilities,
-            'extra' => $this->extra,
+            self::ATTRIBUTE_ID => $this->id,
+            self::ATTRIBUTE_NAME => $this->name,
+            self::ATTRIBUTE_VERSION => $this->version,
+            self::ATTRIBUTE_INSTALLED => $this->installed,
+            self::ATTRIBUTE_ENABLED => $this->enabled,
+            self::ATTRIBUTE_BASE_PATH => $this->basePath,
+            self::ATTRIBUTE_PATHS => $this->paths,
+            self::ATTRIBUTE_PROVIDERS => $this->providers,
+            self::ATTRIBUTE_CAPABILITIES => $this->capabilities,
+            self::ATTRIBUTE_EXTRA => $this->extra,
         ];
     }
 
     /**
-     * @param  array<string, mixed>  $attributes
+     * @param  ModuleDescriptorPayload  $attributes
      */
     public static function fromArray(array $attributes): self
     {
         return new self(
-            $attributes['id'],
-            $attributes['name'] ?? $attributes['id'],
-            $attributes['version'] ?? '0.0.0',
-            (bool) ($attributes['installed'] ?? true),
-            (bool) ($attributes['enabled'] ?? ($attributes['installed'] ?? true)),
-            $attributes['base_path'] ?? '',
-            is_array($attributes['paths'] ?? null) ? $attributes['paths'] : [],
-            self::stringArray($attributes['providers'] ?? []),
-            self::stringArray($attributes['capabilities'] ?? []),
-            is_array($attributes['extra'] ?? null) ? $attributes['extra'] : []
+            $attributes[self::ATTRIBUTE_ID],
+            $attributes[self::ATTRIBUTE_NAME] ?? $attributes[self::ATTRIBUTE_ID],
+            $attributes[self::ATTRIBUTE_VERSION] ?? '0.0.0',
+            (bool) ($attributes[self::ATTRIBUTE_INSTALLED] ?? true),
+            (bool) ($attributes[self::ATTRIBUTE_ENABLED] ?? ($attributes[self::ATTRIBUTE_INSTALLED] ?? true)),
+            $attributes[self::ATTRIBUTE_BASE_PATH] ?? '',
+            is_array($attributes[self::ATTRIBUTE_PATHS] ?? null) ? $attributes[self::ATTRIBUTE_PATHS] : [],
+            self::stringArray($attributes[self::ATTRIBUTE_PROVIDERS] ?? []),
+            self::stringArray($attributes[self::ATTRIBUTE_CAPABILITIES] ?? []),
+            is_array($attributes[self::ATTRIBUTE_EXTRA] ?? null) ? $attributes[self::ATTRIBUTE_EXTRA] : []
         );
     }
 
