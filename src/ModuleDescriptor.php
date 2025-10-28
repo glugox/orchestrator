@@ -3,6 +3,7 @@
 namespace Glugox\Orchestrator;
 
 use Illuminate\Contracts\Support\Arrayable;
+use function is_dir;
 
 class ModuleDescriptor implements Arrayable
 {
@@ -51,6 +52,13 @@ class ModuleDescriptor implements Arrayable
         return $this->basePath;
     }
 
+    public function basePathExists(): bool
+    {
+        $path = $this->basePath();
+
+        return $path !== '' && is_dir($path);
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -91,6 +99,28 @@ class ModuleDescriptor implements Arrayable
     public function isEnabled(): bool
     {
         return $this->enabled;
+    }
+
+    public function isHealthy(): bool
+    {
+        return $this->healthStatus() === 'healthy';
+    }
+
+    public function healthStatus(): string
+    {
+        if (! $this->isInstalled()) {
+            return 'not installed';
+        }
+
+        if (! $this->basePathExists()) {
+            return 'missing files';
+        }
+
+        if (! $this->isEnabled()) {
+            return 'disabled';
+        }
+
+        return 'healthy';
     }
 
     public function enable(): void

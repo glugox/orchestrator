@@ -2,6 +2,7 @@
 
 namespace Glugox\Orchestrator\Commands;
 
+use Glugox\Orchestrator\ModuleDescriptor;
 use Glugox\Orchestrator\ModuleManager;
 use Illuminate\Console\Command;
 
@@ -13,14 +14,20 @@ class ListModulesCommand extends Command
 
     public function handle(ModuleManager $modules): int
     {
-        $rows = $modules->all()->map(function ($module) {
+        $rows = $modules->all()->map(function (ModuleDescriptor $module): array {
+            $providers = $module->providers();
+            $capabilities = $module->capabilities();
+
             return [
                 'id' => $module->id(),
                 'name' => $module->name(),
                 'version' => $module->version(),
                 'installed' => $module->isInstalled() ? 'yes' : 'no',
                 'enabled' => $module->isEnabled() ? 'yes' : 'no',
-                'providers' => implode(PHP_EOL, $module->providers()),
+                'health' => $module->healthStatus(),
+                'path' => $module->basePath(),
+                'providers' => $providers === [] ? '—' : implode(PHP_EOL, $providers),
+                'capabilities' => $capabilities === [] ? '—' : implode(', ', $capabilities),
             ];
         });
 
@@ -31,8 +38,8 @@ class ListModulesCommand extends Command
         }
 
         $this->table(
-            ['ID', 'Name', 'Version', 'Installed', 'Enabled', 'Providers'],
-            $rows->map(fn ($row) => array_values($row))->all()
+            ['ID', 'Name', 'Version', 'Installed', 'Enabled', 'Health', 'Path', 'Providers', 'Capabilities'],
+            $rows->map(fn (array $row): array => array_values($row))->all()
         );
 
         return self::SUCCESS;
