@@ -13,7 +13,7 @@ class ModuleInstaller
     protected string $composerJsonPath;
     protected string $defaultModuleVersion;
 
-    public function __construct(string $composerJsonPath = null, ?string $defaultModuleVersion = null)
+    public function __construct(?string $composerJsonPath = null, ?string $defaultModuleVersion = null)
     {
         $this->composerJsonPath = $composerJsonPath ?? base_path('composer.json');
         $this->defaultModuleVersion = $defaultModuleVersion ?? $this->resolveDefaultModuleVersion();
