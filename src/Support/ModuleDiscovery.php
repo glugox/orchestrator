@@ -5,7 +5,9 @@ namespace Glugox\Orchestrator\Support;
 use Glugox\Orchestrator\ModuleDescriptor;
 use Glugox\Orchestrator\SpecDescriptor;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 class ModuleDiscovery
 {
@@ -47,7 +49,14 @@ class ModuleDiscovery
         $modules = [];
         $files = glob($this->config->moduleSpecsPath().'/*.json') ?: [];
         foreach ($files as $file) {
-            $json = json_decode((string)file_get_contents($file), true);
+            $json = json_decode((string) file_get_contents($file), true);
+
+            if (! is_array($json)) {
+                $this->warn('Skipping invalid module spec: unable to decode JSON.', ['file' => $file]);
+
+                continue;
+            }
+
             $jsonApp = $json['app'] ?? null;
 
             // Check if it is disabled
@@ -55,25 +64,66 @@ class ModuleDiscovery
                 continue;
             }
 
+            if (! is_array($jsonApp)) {
+                $this->warn('Skipping invalid module spec: missing app section.', ['file' => $file]);
 
-            if (!is_array($jsonApp) || !isset($jsonApp['name'])) {
-                throw new \RuntimeException(sprintf('Invalid module spec file: %s, name or module must be set', $file));
+                continue;
+            }
+
+            $name = $jsonApp['name'] ?? null;
+
+            if (! is_string($name) || $name === '') {
+                $this->warn('Skipping invalid module spec: missing or empty app.name.', ['file' => $file]);
+
+                continue;
             }
 
             $vendor = $jsonApp['vendor'] ?? $this->config->defaultVendor();
+
+            if (! is_string($vendor) || $vendor === '') {
+                $this->warn('Skipping module spec because vendor could not be determined.', ['file' => $file]);
+
+                continue;
+            }
+
+            $segments = explode('/', $name);
+            $moduleShortName = $segments[1] ?? end($segments) ?: $name;
+
+            if (! is_string($moduleShortName) || $moduleShortName === '') {
+                $this->warn('Skipping invalid module spec: module name could not be determined.', ['file' => $file]);
+
+                continue;
+            }
+
+            $moduleShortName = strtolower($moduleShortName);
             $vendorPrefix = strtolower($vendor);
-            $moduleShortName = strtolower(explode('/', $jsonApp['name'])[1] ?? $jsonApp['name']);
             $id = $vendorPrefix . '/' . $moduleShortName;
 
             $modules[] = new SpecDescriptor(
                 $id,
-                $jsonApp['name'],
+                $name,
                 $vendor . '\\' . Str::studly($moduleShortName),
                 $file,
             );
         }
 
         return $modules;
+    }
+
+    protected function warn(string $message, array $context = []): void
+    {
+        if (class_exists(Log::class)) {
+            try {
+                Log::warning($message, $context);
+
+                return;
+            } catch (Throwable $exception) {
+                // Fall back to error_log below.
+            }
+        }
+
+        $suffix = empty($context) ? '' : ' '.json_encode($context);
+        error_log($message.$suffix);
     }
 
     /**

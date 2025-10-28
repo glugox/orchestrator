@@ -9,6 +9,8 @@ use Glugox\Orchestrator\Support\OrchestratorConfig;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ModuleManager
 {
@@ -272,12 +274,33 @@ class ModuleManager
             }
 
             if (! class_exists($provider)) {
+                $this->warn('Module provider class is missing.', [
+                    'module' => $module->id(),
+                    'provider' => $provider,
+                ]);
+
                 continue;
             }
 
             $app->register($provider);
             $this->registeredProviders[$provider] = true;
         }
+    }
+
+    protected function warn(string $message, array $context = []): void
+    {
+        if (class_exists(Log::class)) {
+            try {
+                Log::warning($message, $context);
+
+                return;
+            } catch (Throwable $exception) {
+                // Fall back to error_log below.
+            }
+        }
+
+        $suffix = empty($context) ? '' : ' '.json_encode($context);
+        error_log($message.$suffix);
     }
 
     protected function resolveApplication(): ?Application
