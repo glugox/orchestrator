@@ -291,11 +291,17 @@ class ModuleManager
     {
         if (class_exists(Log::class)) {
             try {
-                Log::warning($message, $context);
+                Log::channel('orchestrator')->warning($message, $context);
 
                 return;
             } catch (Throwable $exception) {
-                // Fall back to error_log below.
+                try {
+                    Log::warning($message, $context);
+
+                    return;
+                } catch (Throwable $inner) {
+                    // Fall back to error_log below.
+                }
             }
         }
 

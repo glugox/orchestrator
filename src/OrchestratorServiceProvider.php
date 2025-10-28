@@ -12,6 +12,7 @@ use Glugox\Orchestrator\Commands\ReloadModulesCommand;
 use Glugox\Orchestrator\Services\ModuleRegistry;
 use Glugox\Orchestrator\Support\ModuleDiscovery;
 use Glugox\Orchestrator\Support\OrchestratorConfig;
+use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Support\ServiceProvider;
 
 class OrchestratorServiceProvider extends ServiceProvider
@@ -19,6 +20,8 @@ class OrchestratorServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/orchestrator.php', 'orchestrator');
+
+        $this->ensureLogChannel();
 
         $this->app->singleton(OrchestratorConfig::class, function ($app) {
             $config = $app['config']['orchestrator'] ?? [];
@@ -88,5 +91,40 @@ class OrchestratorServiceProvider extends ServiceProvider
         }
 
         return $this->app->basePath('config/'.$path);
+    }
+
+    protected function ensureLogChannel(): void
+    {
+        if (! $this->app->bound('config')) {
+            return;
+        }
+
+        /** @var ConfigRepository $config */
+        $config = $this->app->make('config');
+
+        $channels = $config->get('logging.channels');
+
+        if (is_array($channels) && array_key_exists('orchestrator', $channels)) {
+            return;
+        }
+
+        $config->set('logging.channels.orchestrator', [
+            'driver' => 'single',
+            'path' => $this->resolveLogPath(),
+            'level' => 'debug',
+        ]);
+    }
+
+    protected function resolveLogPath(): string
+    {
+        if (method_exists($this->app, 'storagePath')) {
+            return $this->app->storagePath().'/logs/orchestrator.log';
+        }
+
+        if (function_exists('storage_path')) {
+            return storage_path('logs/orchestrator.log');
+        }
+
+        return $this->app->basePath('storage/logs/orchestrator.log');
     }
 }
