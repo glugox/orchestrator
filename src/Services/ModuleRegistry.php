@@ -104,19 +104,19 @@ class ModuleRegistry
 
         foreach ($this->modules as $module) {
             $state[$module->id()] = [
-                'installed' => $module->isInstalled(),
-                'enabled' => $module->isEnabled(),
+                ModuleDescriptor::ATTRIBUTE_INSTALLED => $module->isInstalled(),
+                ModuleDescriptor::ATTRIBUTE_ENABLED => $module->isEnabled(),
             ];
         }
 
         foreach ($this->manifest->load() as $attributes) {
-            if (! is_array($attributes) || ! isset($attributes['id'])) {
+            if (! is_array($attributes) || ! isset($attributes[ModuleDescriptor::ATTRIBUTE_ID])) {
                 continue;
             }
 
-            $state[$attributes['id']] = [
-                'installed' => (bool) ($attributes['installed'] ?? $this->config->autoInstall()),
-                'enabled' => (bool) ($attributes['enabled'] ?? $this->config->autoEnable()),
+            $state[$attributes[ModuleDescriptor::ATTRIBUTE_ID]] = [
+                ModuleDescriptor::ATTRIBUTE_INSTALLED => (bool) ($attributes[ModuleDescriptor::ATTRIBUTE_INSTALLED] ?? $this->config->autoInstall()),
+                ModuleDescriptor::ATTRIBUTE_ENABLED => (bool) ($attributes[ModuleDescriptor::ATTRIBUTE_ENABLED] ?? $this->config->autoEnable()),
             ];
         }
 
@@ -126,8 +126,8 @@ class ModuleRegistry
             $override = $state[$module->id()] ?? null;
 
             if ($override) {
-                $module->markInstalled($override['installed']);
-                $module->markEnabled($override['enabled']);
+                $module->markInstalled($override[ModuleDescriptor::ATTRIBUTE_INSTALLED]);
+                $module->markEnabled($override[ModuleDescriptor::ATTRIBUTE_ENABLED]);
             }
 
             $modules[$module->id()] = $module;
@@ -186,7 +186,7 @@ class ModuleRegistry
         $modules = [];
 
         foreach ($data as $attributes) {
-            if (! is_array($attributes) || ! isset($attributes['id'])) {
+            if (! is_array($attributes) || ! isset($attributes[ModuleDescriptor::ATTRIBUTE_ID])) {
                 continue;
             }
 
