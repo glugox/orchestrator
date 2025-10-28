@@ -3,8 +3,9 @@
 namespace Glugox\Orchestrator\Services;
 
 use Illuminate\Support\Facades\Log;
-use Symfony\Component\Process\Process;
 use RuntimeException;
+use Symfony\Component\Process\Process;
+use Throwable;
 
 class ModuleInstaller
 {
@@ -37,7 +38,7 @@ class ModuleInstaller
         }
 
         if ($alreadyRequired) {
-            Log::info("Package {$packageName} already required; skipping composer require.");
+            $this->logInfo("Package {$packageName} already required; skipping composer require.");
 
             if ($repositoryUpdated) {
                 $this->dumpAutoload();
@@ -78,7 +79,7 @@ class ModuleInstaller
 
         $this->saveComposerJson($composer);
 
-        Log::info("Added local repository for {$localPath} to composer.json");
+        $this->logInfo("Added local repository for {$localPath} to composer.json");
 
         return true;
     }
@@ -108,7 +109,7 @@ class ModuleInstaller
 
         $this->runComposerCommand($args);
 
-        Log::info("Required package {$packageName} ({$version})");
+        $this->logInfo("Required package {$packageName} ({$version})");
     }
 
     /**
@@ -117,7 +118,7 @@ class ModuleInstaller
     protected function dumpAutoload(): void
     {
         $this->runComposerCommand(["dump-autoload"]);
-        Log::info("Composer autoload refreshed");
+        $this->logInfo('Composer autoload refreshed');
     }
 
     /**
@@ -137,6 +138,22 @@ class ModuleInstaller
         if (! $process->isSuccessful()) {
             throw new RuntimeException("Composer command failed: " . $process->getErrorOutput());
         }
+    }
+
+    protected function logInfo(string $message, array $context = []): void
+    {
+        if (class_exists(Log::class)) {
+            try {
+                Log::channel('orchestrator')->info($message, $context);
+
+                return;
+            } catch (Throwable $exception) {
+                // Fall back to error_log below.
+            }
+        }
+
+        $suffix = empty($context) ? '' : ' '.json_encode($context);
+        error_log($message.$suffix);
     }
 
     protected function resolveDefaultModuleVersion(): string
