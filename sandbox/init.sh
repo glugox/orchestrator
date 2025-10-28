@@ -13,6 +13,7 @@ composer create-project laravel/laravel "$APP_DIR"
 cd "$APP_DIR"
 
 composer config minimum-stability dev
+composer config prefer-stable false
 
 composer require glugox/orchestrator:@dev
 
