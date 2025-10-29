@@ -3,12 +3,14 @@
 namespace Glugox\Orchestrator\Services;
 
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 use RuntimeException;
 
 class ModuleInstaller
 {
     private const DEFAULT_MODULE_VERSION = '^1.0';
+    private const DEV_VERSION_CONSTRAINT = '@dev';
 
     protected string $composerJsonPath;
     protected string $defaultModuleVersion;
@@ -106,9 +108,24 @@ class ModuleInstaller
     {
         $args = ["require", "{$packageName}:{$version}"];
 
-        $this->runComposerCommand($args);
+        try {
+            $this->runComposerCommand($args);
+            Log::info("Required package {$packageName} ({$version})");
 
-        Log::info("Required package {$packageName} ({$version})");
+            return;
+        } catch (RuntimeException $exception) {
+            if (! $this->shouldRetryWithDevVersion($version, $exception)) {
+                throw $exception;
+            }
+
+            $fallbackVersion = self::DEV_VERSION_CONSTRAINT;
+            Log::warning(
+                "Composer could not satisfy {$packageName}:{$version}; retrying with {$fallbackVersion}."
+            );
+
+            $this->runComposerCommand(["require", "{$packageName}:{$fallbackVersion}"]);
+            Log::info("Required package {$packageName} ({$fallbackVersion})");
+        }
     }
 
     /**
@@ -137,6 +154,24 @@ class ModuleInstaller
         if (! $process->isSuccessful()) {
             throw new RuntimeException("Composer command failed: " . $process->getErrorOutput());
         }
+    }
+
+    protected function shouldRetryWithDevVersion(string $version, RuntimeException $exception): bool
+    {
+        if ($version === self::DEV_VERSION_CONSTRAINT) {
+            return false;
+        }
+
+        $message = $exception->getMessage();
+
+        if ($message === '') {
+            return false;
+        }
+
+        return Str::contains($message, [
+            'does not match the constraint',
+            'could not be found in any version',
+        ]);
     }
 
     protected function resolveDefaultModuleVersion(): string
