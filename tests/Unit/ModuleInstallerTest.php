@@ -96,3 +96,31 @@ it('allows overriding the default version constraint', function () {
         cleanupSandbox($sandbox);
     }
 });
+
+it('falls back to requiring @dev when the preferred constraint is unavailable', function () {
+    $sandbox = createSandbox();
+
+    try {
+        $composerPath = $sandbox.'/composer.json';
+
+        file_put_contents(
+            $composerPath,
+            json_encode([], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+        );
+
+        $installer = new FakeModuleInstaller($composerPath);
+        $installer->failureMessages = [
+            'Composer command failed:   Problem 1 - Root composer.json requires vendor/foo-module ^1.0, found vendor/foo-module[dev-main] but it does not match the constraint.',
+        ];
+
+        $installer->install('vendor/foo-module');
+
+        expect($installer->commands)->toMatchArray([
+            ['require', 'vendor/foo-module:^1.0'],
+            ['require', 'vendor/foo-module:@dev'],
+            ['dump-autoload'],
+        ]);
+    } finally {
+        cleanupSandbox($sandbox);
+    }
+});

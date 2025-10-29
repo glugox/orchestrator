@@ -57,7 +57,17 @@ class BuildModulesCommand extends Command
                     '--config' => $spec->configPath(),
                 ]);
             } catch (Throwable $exception) {
-                $this->error(sprintf('Failed to build module [%s]: %s', $spec->id(), $exception->getMessage()));
+                $this->error(sprintf(
+                    'Failed to build module [%s]: %s in %s:%d',
+                    $spec->id(),
+                    $exception->getMessage(),
+                    $exception->getFile(),
+                    $exception->getLine()
+                ));
+
+                $this->outputSpecDebugInfo($spec);
+                $this->warn('Exception trace:');
+                $this->line($exception->getTraceAsString());
 
                 return self::FAILURE;
             }
@@ -85,5 +95,53 @@ class BuildModulesCommand extends Command
         }
 
         return $basePath.DIRECTORY_SEPARATOR.$namespacePath;
+    }
+
+    protected function outputSpecDebugInfo(SpecDescriptor $spec): void
+    {
+        $path = $spec->configPath();
+        $this->warn(sprintf('Spec file: %s', $path));
+
+        if (! is_file($path)) {
+            $this->warn('Spec file does not exist or is not readable.');
+
+            return;
+        }
+
+        $contents = @file_get_contents($path);
+
+        if ($contents === false) {
+            $this->warn('Spec file could not be read.');
+
+            return;
+        }
+
+        $data = json_decode($contents, true);
+
+        if (! is_array($data)) {
+            $this->warn('Spec file could not be decoded as JSON.');
+
+            return;
+        }
+
+        $sectionNames = array_keys($data);
+
+        if ($sectionNames !== []) {
+            $this->warn('Spec sections: '.implode(', ', $sectionNames));
+        }
+
+        $app = $data['app'] ?? null;
+
+        if (is_array($app)) {
+            $summary = array_filter([
+                'name' => $app['name'] ?? null,
+                'vendor' => $app['vendor'] ?? null,
+                'version' => $app['version'] ?? null,
+            ], static fn ($value): bool => is_string($value) && $value !== '');
+
+            if ($summary !== []) {
+                $this->warn('Spec app summary: '.json_encode($summary));
+            }
+        }
     }
 }
