@@ -12,7 +12,10 @@ use Glugox\Orchestrator\Commands\ReloadModulesCommand;
 use Glugox\Orchestrator\Services\ModuleRegistry;
 use Glugox\Orchestrator\Support\ModuleDiscovery;
 use Glugox\Orchestrator\Support\OrchestratorConfig;
+use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
+use Throwable;
 
 class OrchestratorServiceProvider extends ServiceProvider
 {
@@ -72,9 +75,9 @@ class OrchestratorServiceProvider extends ServiceProvider
             ]);
         }
 
-        $manager = $this->app->make(ModuleManager::class);
-        $manager->setApplication($this->app);
-        $manager->registerEnabledModules($this->app);
+        $this->app->booted(function (Application $app): void {
+            $this->registerEnabledModulesSafely($app);
+        });
     }
 
     protected function configPath(string $path): string
@@ -88,5 +91,34 @@ class OrchestratorServiceProvider extends ServiceProvider
         }
 
         return $this->app->basePath('config/'.$path);
+    }
+
+    /**
+     * Safely register enabled modules once the application has fully booted.
+     */
+    protected function registerEnabledModulesSafely(Application $app): void
+    {
+        try {
+            $manager = $app->make(ModuleManager::class);
+            $manager->setApplication($app);
+            $manager->registerEnabledModules($app);
+        } catch (Throwable $exception) {
+            $this->reportModuleRegistrationFailure($exception);
+        }
+    }
+
+    protected function reportModuleRegistrationFailure(Throwable $exception): void
+    {
+        $message = 'Failed to register enabled orchestrator modules. '.$exception->getMessage();
+
+        try {
+            Log::error($message, [
+                'exception' => $exception,
+            ]);
+        } catch (Throwable) {
+            // Ignore logging failures and fall back to error_log below.
+        }
+
+        error_log($message.' in '.$exception->getFile().':'.$exception->getLine());
     }
 }
