@@ -16,6 +16,7 @@ composer config minimum-stability dev
 composer config prefer-stable false
 
 composer require glugox/orchestrator:@dev
+composer require --dev pestphp/pest --with-all-dependencies
 
 php artisan vendor:publish --tag=orchestrator-config --force
 
