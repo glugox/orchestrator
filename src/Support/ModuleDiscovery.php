@@ -253,6 +253,12 @@ class ModuleDiscovery
             $candidate = $this->config->canonicalizePath($composerDir.DIRECTORY_SEPARATOR.$path);
 
             if ($candidate !== '') {
+                $realPath = realpath($candidate);
+
+                if (is_string($realPath) && $realPath !== '') {
+                    return $this->config->canonicalizePath($realPath);
+                }
+
                 return $candidate;
             }
         }
