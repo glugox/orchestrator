@@ -15,8 +15,7 @@ This Agents.md file provides comprehensive guidance for OpenAI Codex and other A
 - Ensure that all new code is compatible with the existing Laravel framework and its conventions.
 - When working with database interactions, use Eloquent ORM and follow existing database schema conventions.
 - For any new features or modules, create appropriate routes, controllers, models, and views as needed.
-- Ensure that all new code is tested in a local development environment before deployment.
 - Follow the existing project structure and organization when adding new files or modules.
 - Use version control best practices, including meaningful commit messages and branching strategies.
 - For testing, use base_path('.tmp') as the temporary directory to avoid conflicts with existing files. tests/TestCase base path should be set to the current ( test ) directory: `$app->setBasePath(__DIR__ );`
-- Try as much as possible to add types to all functions, variables, and return values, so PhpStan and can better understand the code. Analyze can be done via command `vendor/bin/phpstan analyse`
+- Try as much as possible to add types to all functions, variables, and return values, so PhpStan and can better understand the code.

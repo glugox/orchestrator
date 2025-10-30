@@ -23,6 +23,13 @@ fi
 
 composer create-project laravel/laravel "$APP_DIR"
 
+# Sleep to allow filesystem to settle (especially on Windows)
+# display messages before proceeding
+printf "Waiting for filesystem to settle...\n"
+
+sleep 2
+
+
 cd "$APP_DIR"
 
 composer config minimum-stability dev

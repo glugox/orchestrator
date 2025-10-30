@@ -12,8 +12,8 @@
   "version": "1.0.0",
   "require": {
     "php": ">=8.2",
-    "glugox/module": "^1.0",
-    "glugox/module-generator": "^1.0"
+    "glugox/module": "@dev",
+    "glugox/magic": "@dev"
   },
   "require-dev": {
     "driftingly/rector-laravel": "^2.0.7",
@@ -78,7 +78,7 @@
     },
     {
       "type": "path",
-      "url": "./module-generator",
+      "url": "../magic",
       "options": {
         "symlink": true
       }
@@ -87,12 +87,6 @@
   "minimum-stability": "dev",
   "prefer-stable": true,
   "scripts": {
-    "post-autoload-dump": [
-      "@clear",
-      "@prepare"
-    ],
-    "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
-    "prepare": "@php vendor/bin/testbench package:discover --ansi",
     "build": "@php vendor/bin/testbench workbench:build --ansi",
     "serve": [
       "Composer\\Config::disableProcessTimeout",

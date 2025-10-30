@@ -12,7 +12,9 @@ fi
 cd "$APP_DIR"
 
 php artisan orchestrator:build
-php artisan orchestrator:install company/blog
+#php artisan orchestrator:install company/blog
 php artisan orchestrator:install company/crm
 php artisan migrate --force
-./vendor/bin/pest
+#./vendor/bin/pest
+
+
