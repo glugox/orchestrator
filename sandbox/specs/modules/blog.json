@@ -1,0 +1,65 @@
+{
+  "app": {
+    "name": "company/blog",
+    "vendor": "Company",
+    "description": "Blog module exposing a posts listing.",
+    "version": "1.0.0"
+  },
+  "database": {
+    "migrations": [
+      {
+        "name": "create_posts_table",
+        "table": "posts",
+        "columns": [
+          {"name": "id", "type": "id"},
+          {"name": "title", "type": "string"},
+          {"name": "body", "type": "text"},
+          {"name": "published_at", "type": "timestamp", "nullable": true},
+          {"name": "created_at", "type": "timestamp", "nullable": true},
+          {"name": "updated_at", "type": "timestamp", "nullable": true}
+        ]
+      }
+    ]
+  },
+  "entities": {
+    "Post": {
+      "table": "posts",
+      "fillable": ["title", "body", "published_at"],
+      "casts": {
+        "published_at": "datetime"
+      }
+    }
+  },
+  "http": {
+    "routes": [
+      {
+        "uri": "/blog/posts",
+        "methods": ["GET"],
+        "action": "PostController@index",
+        "name": "blog.posts.index"
+      }
+    ],
+    "controllers": {
+      "PostController": {
+        "resource": false,
+        "actions": {
+          "index": {
+            "type": "view",
+            "view": "blog::posts.index",
+            "data": {
+              "title": "Posts"
+            }
+          }
+        }
+      }
+    },
+    "views": {
+      "posts/index.blade.php": {
+        "layout": null,
+        "sections": {
+          "default": "<h1>Posts</h1>"
+        }
+      }
+    }
+  }
+}
