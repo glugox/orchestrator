@@ -105,4 +105,21 @@ return [
     */
     'auto_install' => true,
     'auto_enable' => true,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Developer Tools
+    |--------------------------------------------------------------------------
+    |
+    | The orchestrator can expose diagnostic routes that help during local
+    | development. These routes are disabled by default and should never be
+    | enabled in production. Toggle them on when you need to inspect module
+    | state or to step through the module manager with a debugger.
+    */
+    'dev_tools' => [
+        'enabled' => env('ORCHESTRATOR_DEV_ENABLED', false),
+        'prefix' => 'dev/orchestrator',
+        'middleware' => ['web'],
+        'domain' => null,
+    ],
 ];
