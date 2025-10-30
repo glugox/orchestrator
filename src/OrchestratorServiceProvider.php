@@ -10,6 +10,7 @@ use Glugox\Orchestrator\Commands\InstallModuleCommand;
 use Glugox\Orchestrator\Commands\ListModulesCommand;
 use Glugox\Orchestrator\Commands\ReloadModulesCommand;
 use Glugox\Orchestrator\Services\ModuleRegistry;
+use Glugox\Orchestrator\Support\DevRouteRegistrar;
 use Glugox\Orchestrator\Support\ModuleDiscovery;
 use Glugox\Orchestrator\Support\OrchestratorConfig;
 use Illuminate\Contracts\Foundation\Application;
@@ -75,9 +76,22 @@ class OrchestratorServiceProvider extends ServiceProvider
             ]);
         }
 
+        $this->registerDevRoutes();
+
         $this->app->booted(function (Application $app): void {
             $this->registerEnabledModulesSafely($app);
         });
+    }
+
+    protected function registerDevRoutes(): void
+    {
+        $config = $this->app['config']->get('orchestrator.dev_tools', []);
+
+        if (! is_array($config) || ($config['enabled'] ?? false) !== true) {
+            return;
+        }
+
+        (new DevRouteRegistrar($this->app, $config))->register();
     }
 
     protected function configPath(string $path): string
