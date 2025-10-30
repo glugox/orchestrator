@@ -10,6 +10,7 @@ use Glugox\Orchestrator\Commands\InstallModuleCommand;
 use Glugox\Orchestrator\Commands\ListModulesCommand;
 use Glugox\Orchestrator\Commands\ReloadModulesCommand;
 use Glugox\Orchestrator\Services\ModuleRegistry;
+use Glugox\Orchestrator\Support\DevRouteRegistrar;
 use Glugox\Orchestrator\Support\ModuleDiscovery;
 use Glugox\Orchestrator\Support\OrchestratorConfig;
 use Illuminate\Contracts\Foundation\Application;
@@ -75,9 +76,56 @@ class OrchestratorServiceProvider extends ServiceProvider
             ]);
         }
 
+        $this->registerDevRoutes();
+
         $this->app->booted(function (Application $app): void {
             $this->registerEnabledModulesSafely($app);
         });
+    }
+
+    protected function registerDevRoutes(): void
+    {
+        $config = $this->app['config']->get('orchestrator.dev_tools', []);
+
+        if (! $this->shouldRegisterDevRoutes($config)) {
+            return;
+        }
+
+        (new DevRouteRegistrar($this->app, $config))->register();
+    }
+
+    /**
+     * Determine whether the dev routes should be registered for the current request cycle.
+     */
+    protected function shouldRegisterDevRoutes(mixed $config): bool
+    {
+        if (! is_array($config)) {
+            return false;
+        }
+
+        $enabled = $config['enabled'] ?? null;
+
+        if ($enabled === null) {
+            return (bool) $this->app['config']->get('app.debug', false);
+        }
+
+        if (is_bool($enabled)) {
+            return $enabled;
+        }
+
+        if (is_string($enabled)) {
+            $normalized = strtolower($enabled);
+
+            if (in_array($normalized, ['1', 'true', 'on', 'yes'], true)) {
+                return true;
+            }
+
+            if (in_array($normalized, ['0', 'false', 'off', 'no'], true)) {
+                return false;
+            }
+        }
+
+        return (bool) $enabled;
     }
 
     protected function configPath(string $path): string
