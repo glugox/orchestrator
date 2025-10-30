@@ -10,15 +10,22 @@ fi
 
 composer create-project laravel/laravel "$APP_DIR"
 
+# Sleep to allow filesystem to settle (especially on Windows)
+# display messages before proceeding
+printf "Waiting for filesystem to settle...\n"
+
+sleep 2
+
+
 cd "$APP_DIR"
 
 composer config minimum-stability dev
 composer config prefer-stable false
 
 composer require glugox/orchestrator:@dev
-composer require --dev pestphp/pest --with-all-dependencies
+#composer require --dev pestphp/pest --with-all-dependencies
 
-php artisan vendor:publish --tag=orchestrator-config --force
+#php artisan vendor:publish --tag=orchestrator-config --force
 
 if [ -L "$APP_DIR/specs" ] || [ -e "$APP_DIR/specs" ]; then
     rm -rf "$APP_DIR/specs"

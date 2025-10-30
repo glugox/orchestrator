@@ -1,97 +1,50 @@
 {
-  "app": {
-    "name": "company/crm",
-    "vendor": "Company",
-    "description": "CRM module exposing customers and invoices listings.",
-    "version": "1.0.0"
-  },
-  "database": {
-    "migrations": [
-      {
-        "name": "create_customers_table",
-        "table": "customers",
-        "columns": [
-          {"name": "id", "type": "id"},
-          {"name": "name", "type": "string"},
-          {"name": "email", "type": "string"},
-          {"name": "phone", "type": "string", "nullable": true},
-          {"name": "created_at", "type": "timestamp", "nullable": true},
-          {"name": "updated_at", "type": "timestamp", "nullable": true}
-        ]
-      },
-      {
-        "name": "create_invoices_table",
-        "table": "invoices",
-        "columns": [
-          {"name": "id", "type": "id"},
-          {"name": "customer_id", "type": "foreignId", "references": "id", "on": "customers", "onDelete": "cascade"},
-          {"name": "number", "type": "string"},
-          {"name": "amount", "type": "decimal", "precision": 10, "scale": 2},
-          {"name": "due_date", "type": "date"},
-          {"name": "created_at", "type": "timestamp", "nullable": true},
-          {"name": "updated_at", "type": "timestamp", "nullable": true}
-        ]
-      }
+    "app": {
+        "disabled": false,
+        "name": "CRM",
+        "seedEnabled": true,
+        "seedCount": 20,
+        "fakerMappings": {
+            "company_name": "company",
+            "contact_email": "safeEmail"
+        }
+    },
+    "entities": [
+        {
+            "name": "Customer",
+            "fields": [
+                { "name": "id", "type": "id" },
+                { "name": "company_name", "type": "string", "searchable": true, "sortable": true, "unique": true },
+                { "name": "industry", "type": "enum", "options": ["tech", "finance", "retail"] },
+                { "name": "active", "type": "boolean", "default": true }
+            ],
+            "relations": [
+                { "type": "hasMany", "relatedEntityName": "Contact" }
+            ],
+            "filters": [
+                { "field": "company_name", "type": "text" },
+                { "field": "industry", "type": "enum" },
+                { "field": "active", "type": "boolean" }
+            ],
+            "actions": [
+                { "name": "deactivate", "label": "Deactivate", "type": "command", "command": "customer:deactivate" }
+            ]
+        },
+        {
+            "name": "Contact",
+            "fields": [
+                { "name": "id", "type": "id" },
+                { "name": "name", "type": "string", "searchable": true },
+                { "name": "email", "type": "string", "unique": true },
+                { "name": "phone", "type": "string", "nullable": true }
+            ],
+            "relations": [
+                { "type": "belongsTo", "relatedEntityName": "Customer" }
+            ],
+            "filters": [
+                { "field": "name", "type": "text" },
+                { "field": "email", "type": "text" }
+            ]
+        }
     ]
-  },
-  "entities": {
-    "Customer": {
-      "table": "customers",
-      "fillable": ["name", "email", "phone"],
-      "relations": {
-        "invoices": {
-          "type": "hasMany",
-          "model": "Invoice",
-          "foreign_key": "customer_id"
-        }
-      }
-    },
-    "Invoice": {
-      "table": "invoices",
-      "fillable": ["customer_id", "number", "amount", "due_date"],
-      "casts": {
-        "amount": "decimal:2",
-        "due_date": "date"
-      },
-      "relations": {
-        "customer": {
-          "type": "belongsTo",
-          "model": "Customer",
-          "foreign_key": "customer_id"
-        }
-      }
-    }
-  },
-  "http": {
-    "routes": [
-      {
-        "uri": "/crm/customers",
-        "methods": ["GET"],
-        "action": "CustomerController@index",
-        "name": "crm.customers.index"
-      }
-    ],
-    "controllers": {
-      "CustomerController": {
-        "resource": false,
-        "actions": {
-          "index": {
-            "type": "view",
-            "view": "crm::customers.index",
-            "data": {
-              "title": "Customers"
-            }
-          }
-        }
-      }
-    },
-    "views": {
-      "customers/index.blade.php": {
-        "layout": null,
-        "sections": {
-          "default": "<h1>Customers</h1>"
-        }
-      }
-    }
-  }
 }
