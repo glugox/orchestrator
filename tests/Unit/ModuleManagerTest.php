@@ -38,6 +38,36 @@ it('discovers modules from composer metadata and module json files', function ()
     }
 });
 
+it('resolves symlinked composer modules to their real path', function () {
+    $sandbox = createSandbox();
+
+    try {
+        populateSandbox($sandbox);
+
+        $moduleTarget = $sandbox . DIRECTORY_SEPARATOR . 'modules' . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'foo-module';
+        if (! is_dir($moduleTarget)) {
+            mkdir($moduleTarget, 0777, true);
+        }
+
+        $vendorModule = $sandbox . DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR . 'foo-module';
+
+        if (is_dir($vendorModule) && ! is_link($vendorModule)) {
+            rmdir($vendorModule);
+        }
+
+        if (! is_link($vendorModule)) {
+            symlink($moduleTarget, $vendorModule);
+        }
+
+        $manager = new ModuleManager(orchestratorConfig($sandbox));
+        $module = $manager->module('vendor/foo-module');
+
+        expect($module->basePath())->toBe($moduleTarget);
+    } finally {
+        cleanupSandbox($sandbox);
+    }
+});
+
 it('persists module state changes to the manifest', function () {
     $sandbox = createSandbox();
 
