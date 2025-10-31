@@ -124,3 +124,81 @@ it('falls back to requiring @dev when the preferred constraint is unavailable', 
         cleanupSandbox($sandbox);
     }
 });
+
+it('registers local repositories using relative paths', function () {
+    $sandbox = createSandbox();
+
+    try {
+        $composerPath = $sandbox.'/composer.json';
+
+        file_put_contents(
+            $composerPath,
+            json_encode(['name' => 'sandbox/app'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+        );
+
+        $modulePath = $sandbox.'/modules/Glugox/Crm';
+        mkdir($modulePath, 0777, true);
+
+        $installer = new FakeModuleInstaller($composerPath);
+
+        $installer->install('glugox/crm', $modulePath);
+
+        $composer = json_decode(file_get_contents($composerPath), true);
+
+        expect($composer)
+            ->toHaveKey('repositories')
+            ->and($composer['repositories'][0]['type'] ?? null)->toBe('path')
+            ->and($composer['repositories'][0]['url'] ?? null)->toBe('modules/Glugox/Crm')
+            ->and($composer['repositories'][0]['options'] ?? [])->toBe(['symlink' => true]);
+
+        expect($installer->commands)->toBe([
+            ['require', 'glugox/crm:^1.0'],
+            ['dump-autoload'],
+        ]);
+    } finally {
+        cleanupSandbox($sandbox);
+    }
+});
+
+it('normalises existing path repositories to relative paths', function () {
+    $sandbox = createSandbox();
+
+    try {
+        $composerPath = $sandbox.'/composer.json';
+        $modulePath = $sandbox.'/modules/Glugox/Crm';
+
+        mkdir($modulePath, 0777, true);
+
+        $initialComposer = [
+            'name' => 'sandbox/app',
+            'require' => ['glugox/crm' => '^1.0'],
+            'repositories' => [
+                [
+                    'type' => 'path',
+                    'url' => $sandbox.'/modules/Glugox/Crm',
+                    'options' => ['symlink' => true],
+                ],
+            ],
+        ];
+
+        file_put_contents(
+            $composerPath,
+            json_encode($initialComposer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+        );
+
+        $installer = new FakeModuleInstaller($composerPath);
+
+        $installer->install('glugox/crm', $modulePath);
+
+        expect($installer->commands)->toBe([
+            ['dump-autoload'],
+        ]);
+
+        $composer = json_decode(file_get_contents($composerPath), true);
+
+        expect($composer['repositories'])->toHaveCount(1)
+            ->and($composer['repositories'][0]['url'])->toBe('modules/Glugox/Crm');
+    } finally {
+        cleanupSandbox($sandbox);
+    }
+});
