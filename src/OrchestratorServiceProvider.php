@@ -87,11 +87,45 @@ class OrchestratorServiceProvider extends ServiceProvider
     {
         $config = $this->app['config']->get('orchestrator.dev_tools', []);
 
-        if (! is_array($config) || ($config['enabled'] ?? false) !== true) {
+        if (! $this->shouldRegisterDevRoutes($config)) {
             return;
         }
 
         (new DevRouteRegistrar($this->app, $config))->register();
+    }
+
+    /**
+     * Determine whether the dev routes should be registered for the current request cycle.
+     */
+    protected function shouldRegisterDevRoutes(mixed $config): bool
+    {
+        if (! is_array($config)) {
+            return false;
+        }
+
+        $enabled = $config['enabled'] ?? null;
+
+        if ($enabled === null) {
+            return (bool) $this->app['config']->get('app.debug', false);
+        }
+
+        if (is_bool($enabled)) {
+            return $enabled;
+        }
+
+        if (is_string($enabled)) {
+            $normalized = strtolower($enabled);
+
+            if (in_array($normalized, ['1', 'true', 'on', 'yes'], true)) {
+                return true;
+            }
+
+            if (in_array($normalized, ['0', 'false', 'off', 'no'], true)) {
+                return false;
+            }
+        }
+
+        return (bool) $enabled;
     }
 
     protected function configPath(string $path): string

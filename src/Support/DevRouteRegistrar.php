@@ -10,6 +10,8 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use InvalidArgumentException;
+use ReflectionClass;
+use ReflectionException;
 
 class DevRouteRegistrar
 {
@@ -103,6 +105,7 @@ class DevRouteRegistrar
                 'healthy' => $module->isHealthy(),
                 'base_path_exists' => $module->basePathExists(),
             ],
+            'provider_diagnostics' => $this->describeProviders($module),
         ]);
     }
 
@@ -132,5 +135,50 @@ class DevRouteRegistrar
         $domain = trim($domain);
 
         return $domain === '' ? null : $domain;
+    }
+
+    /**
+     * @return array<int, array{class: string, exists: bool, loaded: bool, path: string|null}>
+     */
+    protected function describeProviders(ModuleDescriptor $module): array
+    {
+        $providers = [];
+
+        foreach ($module->providers() as $provider) {
+            if (! is_string($provider) || $provider === '') {
+                continue;
+            }
+
+            $providers[] = $this->describeProvider($provider);
+        }
+
+        return $providers;
+    }
+
+    /**
+     * @return array{class: string, exists: bool, loaded: bool, path: string|null}
+     */
+    protected function describeProvider(string $provider): array
+    {
+        $loaded = class_exists($provider, false);
+        $exists = class_exists($provider);
+        $path = null;
+
+        if ($exists) {
+            try {
+                $reflection = new ReflectionClass($provider);
+                $path = $reflection->getFileName() ?: null;
+            } catch (ReflectionException) {
+                $exists = false;
+                $path = null;
+            }
+        }
+
+        return [
+            'class' => $provider,
+            'exists' => $exists,
+            'loaded' => $loaded,
+            'path' => $path,
+        ];
     }
 }

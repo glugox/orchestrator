@@ -117,7 +117,7 @@ return [
     | state or to step through the module manager with a debugger.
     */
     'dev_tools' => [
-        'enabled' => env('ORCHESTRATOR_DEV_ENABLED', false),
+        'enabled' => env('ORCHESTRATOR_DEV_ENABLED'),
         'prefix' => 'dev/orchestrator',
         'middleware' => ['web'],
         'domain' => null,

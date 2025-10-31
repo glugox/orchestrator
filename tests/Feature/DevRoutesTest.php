@@ -5,12 +5,15 @@ use Glugox\Orchestrator\ModuleManager;
 use Glugox\Orchestrator\SpecDescriptor;
 use InvalidArgumentException;
 use Mockery;
+use Tests\Fixtures\FakeModuleServiceProvider;
 
 uses(Tests\TestCase::class);
 
 beforeEach(function (): void {
     config()->set('orchestrator.dev_tools.prefix', 'dev/orchestrator');
     config()->set('orchestrator.dev_tools.middleware', []);
+    config()->set('orchestrator.dev_tools.enabled', false);
+    config()->set('app.debug', false);
 });
 
 afterEach(function (): void {
@@ -19,6 +22,21 @@ afterEach(function (): void {
 
 it('does not expose dev routes when disabled', function () {
     $this->get('/dev/orchestrator')->assertNotFound();
+});
+
+it('auto enables dev routes when app debug mode is on', function () {
+    config()->set('orchestrator.dev_tools.enabled', null);
+    config()->set('app.debug', true);
+
+    $manager = Mockery::mock(ModuleManager::class);
+    $manager->shouldReceive('all')->andReturn(collect());
+    $manager->shouldReceive('installed')->andReturn(collect());
+    $manager->shouldReceive('enabledModules')->andReturn(collect());
+    $manager->shouldReceive('specs')->andReturn(collect());
+
+    $this->app->instance(ModuleManager::class, $manager);
+
+    $this->get('/dev/orchestrator')->assertOk();
 });
 
 it('exposes orchestrator diagnostics when enabled', function () {
@@ -32,7 +50,7 @@ it('exposes orchestrator diagnostics when enabled', function () {
         'enabled' => true,
         'base_path' => __DIR__,
         'paths' => [],
-        'providers' => [],
+        'providers' => [FakeModuleServiceProvider::class],
         'capabilities' => [],
         'extra' => [],
     ]);
@@ -47,7 +65,9 @@ it('exposes orchestrator diagnostics when enabled', function () {
 
     $this->app->instance(ModuleManager::class, $manager);
 
-    $this->get('/dev/orchestrator')
+    $response = $this->get('/dev/orchestrator');
+
+    $response
         ->assertOk()
         ->assertJson([
             'summary' => [
@@ -72,7 +92,20 @@ it('exposes orchestrator diagnostics when enabled', function () {
                     'config_path' => __DIR__.'/../Fixtures/specs/crm.json',
                 ],
             ],
+        ])
+        ->assertJsonFragment([
+            'class' => FakeModuleServiceProvider::class,
+            'exists' => true,
+            'loaded' => true,
         ]);
+
+    $expectedProviderPath = realpath(__DIR__.'/../Fixtures/FakeModuleServiceProvider.php');
+    $this->assertIsString($expectedProviderPath);
+
+    $response->assertJsonPath(
+        'modules.0.provider_diagnostics.0.path',
+        $expectedProviderPath
+    );
 });
 
 it('returns module diagnostics for a specific module', function () {
@@ -86,7 +119,7 @@ it('returns module diagnostics for a specific module', function () {
         'enabled' => true,
         'base_path' => __DIR__,
         'paths' => [],
-        'providers' => [],
+        'providers' => ['Missing\\Provider'],
         'capabilities' => [],
         'extra' => [],
     ]);
@@ -104,6 +137,12 @@ it('returns module diagnostics for a specific module', function () {
                 'status' => 'healthy',
                 'healthy' => true,
             ],
+        ])
+        ->assertJsonFragment([
+            'class' => 'Missing\\Provider',
+            'exists' => false,
+            'loaded' => false,
+            'path' => null,
         ]);
 });
 
