@@ -60,20 +60,46 @@ class ModuleInstaller
         $composer = $this->loadComposerJson();
         $repositories = $composer['repositories'] ?? [];
 
-        $repoEntry = [
-            'type' => 'path',
-            'url' => $localPath,
-            'options' => ['symlink' => true],
-        ];
+        $normalizedPath = $this->normaliseRepositoryUrl($localPath);
+        $absoluteLocalPath = $this->canonicalizeRepositoryPath($localPath);
 
         // Already present?
-        foreach ($repositories as $repo) {
-            if (($repo['type'] ?? '') === 'path' && ($repo['url'] ?? '') === $localPath) {
-                return false;
+        foreach ($repositories as $index => $repo) {
+            if (($repo['type'] ?? '') !== 'path') {
+                continue;
+            }
+
+            $existingUrl = (string) ($repo['url'] ?? '');
+
+            if ($existingUrl === '') {
+                continue;
+            }
+
+            if ($this->canonicalizeRepositoryPath($existingUrl) === $absoluteLocalPath) {
+                $normalisedExisting = $this->normaliseRepositoryUrl($existingUrl);
+
+                if ($normalisedExisting === $normalizedPath) {
+                    return false;
+                }
+
+                $repositories[$index]['url'] = $normalizedPath;
+                $composer['repositories'] = $repositories;
+                $composer['minimum-stability'] = $composer['minimum-stability'] ?? 'dev';
+                $composer['prefer-stable'] = $composer['prefer-stable'] ?? true;
+
+                $this->saveComposerJson($composer);
+
+                Log::info("Updated local repository for {$localPath} in composer.json");
+
+                return true;
             }
         }
 
-        $repositories[] = $repoEntry;
+        $repositories[] = [
+            'type' => 'path',
+            'url' => $normalizedPath,
+            'options' => ['symlink' => true],
+        ];
         $composer['repositories'] = $repositories;
         $composer['minimum-stability'] = $composer['minimum-stability'] ?? 'dev';
         $composer['prefer-stable'] = $composer['prefer-stable'] ?? true;
@@ -210,6 +236,121 @@ class ModuleInstaller
             $this->composerJsonPath,
             json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
         );
+    }
+
+    protected function normaliseRepositoryUrl(string $localPath): string
+    {
+        $absolute = $this->canonicalizeRepositoryPath($localPath);
+        $base = $this->canonicalizePath($this->composerBaseDirectory());
+
+        $relative = $this->relativePath($absolute, $base);
+
+        if ($relative !== null && $relative !== '') {
+            return $this->normaliseToForwardSlashes($relative);
+        }
+
+        return $this->normaliseToForwardSlashes($absolute);
+    }
+
+    protected function canonicalizeRepositoryPath(string $path): string
+    {
+        $normalised = $this->canonicalizePath($path);
+
+        if ($this->isAbsolutePath($normalised)) {
+            return $normalised;
+        }
+
+        $base = $this->canonicalizePath($this->composerBaseDirectory());
+
+        return $this->canonicalizePath($base.DIRECTORY_SEPARATOR.$normalised);
+    }
+
+    protected function composerBaseDirectory(): string
+    {
+        $directory = dirname($this->composerJsonPath);
+
+        return $directory !== '' ? $directory : '.';
+    }
+
+    protected function relativePath(string $path, string $base): ?string
+    {
+        $path = rtrim($path, DIRECTORY_SEPARATOR);
+        $base = rtrim($base, DIRECTORY_SEPARATOR);
+
+        if ($base === '') {
+            return null;
+        }
+
+        if ($this->pathsEqual($path, $base)) {
+            return '';
+        }
+
+        $prefixLength = strlen($base);
+
+        if ($this->startsWithPath($path, $base.DIRECTORY_SEPARATOR)) {
+            return substr($path, $prefixLength + 1);
+        }
+
+        return null;
+    }
+
+    protected function pathsEqual(string $a, string $b): bool
+    {
+        if (DIRECTORY_SEPARATOR === '\\') {
+            return strcasecmp($a, $b) === 0;
+        }
+
+        return $a === $b;
+    }
+
+    protected function startsWithPath(string $path, string $prefix): bool
+    {
+        if (DIRECTORY_SEPARATOR === '\\') {
+            return strncasecmp($path, $prefix, strlen($prefix)) === 0;
+        }
+
+        return str_starts_with($path, $prefix);
+    }
+
+    protected function canonicalizePath(string $path): string
+    {
+        $path = str_replace(['\\', '/'], DIRECTORY_SEPARATOR, $path);
+        $segments = explode(DIRECTORY_SEPARATOR, $path);
+        $stack = [];
+        $prefix = '';
+
+        if ($path !== '' && ($path[0] ?? '') === DIRECTORY_SEPARATOR) {
+            $prefix = DIRECTORY_SEPARATOR;
+        } elseif (isset($segments[0]) && preg_match('/^[A-Za-z]:$/', $segments[0])) {
+            $prefix = array_shift($segments).DIRECTORY_SEPARATOR;
+        }
+
+        foreach ($segments as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                array_pop($stack);
+                continue;
+            }
+
+            $stack[] = $segment;
+        }
+
+        $resolved = implode(DIRECTORY_SEPARATOR, $stack);
+
+        return $prefix.$resolved;
+    }
+
+    protected function isAbsolutePath(string $path): bool
+    {
+        return Str::startsWith($path, ['/', '\\']) || (strlen($path) > 1 && $path[1] === ':');
+    }
+
+    protected function normaliseToForwardSlashes(string $path): string
+    {
+        return str_replace(['\\', DIRECTORY_SEPARATOR], '/', $path);
     }
 }
 
