@@ -15,17 +15,17 @@ connects everything at runtime inside the main Laravel app.
 ## Architecture at a Glance
 
 ```
-┌────────────────────┐         ┌────────────────────┐         ┌────────────────────┐
-│  Main Laravel App  │────┬──▶ │  glugox/orchestr.  │ ───────▶│    Module Runtime  │
-└────────────────────┘    │    └────────────────────┘         │ (Routes, Migrations│
-                          │                                   │  Providers, etc.)  │
-                          │    ┌────────────────────┐         └────────────────────┘
-                          └──▶ │  glugox/module     │ ◀────┐
-                               └────────────────────┘      │
-                                                           │
-                               ┌────────────────────┐      │
-                               │ glugox/module-gen. │ ─────┘
-                               └────────────────────┘
+┌──────────────────────┐         ┌─────────────────────────┐
+│   Main Laravel App   │ ◀────── │   glugox/orchestrator   │
+│ (Artisan & runtime)  │  manages│  (Module runtime core)  │
+└──────────────────────┘         └────────────┬────────────┘
+                                             discovers
+                           ┌──────────────────┴──────────────────┐
+                           │                                     │
+           ┌────────────────────────┐            ┌────────────────────────────┐
+           │     glugox/module      │  empowers  │   glugox/module-generator   │
+           │ (Contracts & lifecycles)│           │   (Scaffolds conventions)   │
+           └────────────────────────┘            └────────────────────────────┘
 ```
 
 * **Main Laravel App** – hosts the modules and exposes the artisan commands and APIs to administrators.
