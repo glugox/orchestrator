@@ -2,6 +2,7 @@
 
 namespace Glugox\Orchestrator;
 
+use Glugox\Orchestrator\Commands\BootCommand;
 use Glugox\Orchestrator\Commands\BuildModulesCommand;
 use Glugox\Orchestrator\Commands\DisableModuleCommand;
 use Glugox\Orchestrator\Commands\DoctorCommand;
@@ -70,6 +71,7 @@ class OrchestratorServiceProvider extends ServiceProvider
                 EnableModuleCommand::class,
                 DisableModuleCommand::class,
                 ReloadModulesCommand::class,
+                BootCommand::class,
                 BuildModulesCommand::class,
                 InstallModuleCommand::class,
                 DoctorCommand::class
