@@ -1,0 +1,33 @@
+{
+    "name": "demo/hello-world",
+    "description": "Demo hello world module showcasing orchestrator integration.",
+    "type": "laravel-module",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Demo\\\\HelloWorld\\\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Demo\\\\HelloWorld\\\\Providers\\\\HelloWorldServiceProvider"
+            ]
+        },
+        "glugox-module": {
+            "id": "demo/hello-world",
+            "name": "Hello World",
+            "version": "1.0.0",
+            "routes": [
+                "routes/api.php"
+            ],
+            "capabilities": [
+                "http:api"
+            ],
+            "requires": {
+                "php": ">=8.2",
+                "laravel/framework": ">=11.0"
+            }
+        }
+    }
+}
