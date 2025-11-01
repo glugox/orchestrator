@@ -1,0 +1,15 @@
+{
+    "id": "demo/hello-world",
+    "name": "Hello World",
+    "version": "1.0.0",
+    "description": "Sample API module shipped with the orchestrator demo.",
+    "providers": [
+        "Demo\\\\HelloWorld\\\\Providers\\\\HelloWorldServiceProvider"
+    ],
+    "routes": [
+        "routes/api.php"
+    ],
+    "capabilities": [
+        "http:api"
+    ]
+}

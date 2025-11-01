@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-APP_DIR="$SCRIPT_DIR/laravel-app"
+APP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)/demo/laravel-app"
 
 if [ ! -d "$APP_DIR" ]; then
     echo "Laravel app not found at $APP_DIR. Please run sandbox/init.sh first." >&2
